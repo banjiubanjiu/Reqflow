@@ -1,6 +1,7 @@
 const express = require('express');
 const supabase = require('../config/supabase');
 const { authenticateToken } = require('../middleware/auth');
+const qwenService = require('../services/qwenService');
 
 const router = express.Router();
 
@@ -360,6 +361,79 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error('Delete project error:', error);
     res.status(500).json({ error: '服务器内部错误' });
+  }
+});
+
+/**
+ * @swagger
+ * /api/projects/generate-names:
+ *   post:
+ *     tags: [项目管理]
+ *     summary: AI生成项目名称建议
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - description
+ *             properties:
+ *               description:
+ *                 type: string
+ *                 example: 我想做一个在线教育平台，主要功能包括课程管理、学员注册、视频播放等
+ *     responses:
+ *       200:
+ *         description: 成功生成项目名称建议
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 suggestions:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       name:
+ *                         type: string
+ *                         example: EduFlow
+ *                       reason:
+ *                         type: string
+ *                         example: 结合教育(Edu)和流程(Flow)，体现在线教育平台的流畅体验
+ *       400:
+ *         description: 请求参数错误
+ *       401:
+ *         description: 未授权
+ *       500:
+ *         description: 服务器错误
+ */
+router.post('/generate-names', async (req, res) => {
+  try {
+    const { description } = req.body;
+
+    if (!description || description.trim().length === 0) {
+      return res.status(400).json({ error: '项目描述不能为空' });
+    }
+
+    if (description.length < 10) {
+      return res.status(400).json({ error: '项目描述至少需要10个字符' });
+    }
+
+    console.log('Generating project names for:', description.substring(0, 100));
+
+    const suggestions = await qwenService.generateProjectNames(description);
+
+    res.json({ suggestions });
+
+  } catch (error) {
+    console.error('Generate project names error:', error);
+    res.status(500).json({ 
+      error: '生成项目名称失败',
+      details: error.message 
+    });
   }
 });
 

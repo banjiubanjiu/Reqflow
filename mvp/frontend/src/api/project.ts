@@ -23,6 +23,19 @@ export interface ProjectDeleteResponse {
   message: string
 }
 
+export interface ProjectNameSuggestion {
+  name: string
+  reason: string
+}
+
+export interface GenerateNamesRequest {
+  description: string
+}
+
+export interface GenerateNamesResponse {
+  suggestions: ProjectNameSuggestion[]
+}
+
 export const projectApi = {
   // 获取项目列表
   getProjects: (): Promise<ProjectListResponse> => {
@@ -47,5 +60,10 @@ export const projectApi = {
   // 删除项目
   deleteProject: (id: string): Promise<ProjectDeleteResponse> => {
     return api.delete(`/projects/${id}`)
+  },
+
+  // AI生成项目名称建议
+  generateProjectNames: (data: GenerateNamesRequest): Promise<GenerateNamesResponse> => {
+    return api.post('/projects/generate-names', data)
   }
 }

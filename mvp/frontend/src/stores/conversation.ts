@@ -84,7 +84,10 @@ export const useConversationStore = defineStore('conversation', () => {
       
       if (response.conversation && currentConversation.value) {
         currentConversation.value = response.conversation
-        return { success: true }
+        return { 
+          success: true, 
+          requirementSummary: response.requirement_summary 
+        }
       } else {
         throw new Error('Invalid response format')
       }

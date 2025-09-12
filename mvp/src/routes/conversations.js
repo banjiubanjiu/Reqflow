@@ -294,24 +294,72 @@ router.put('/:id/complete', async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data: conversation, error } = await supabase
+    // 获取对话详情，包括项目信息
+    const { data: conversation, error: getError } = await supabase
       .from('ai_conversations')
-      .update({ is_completed: true })
-      .eq('id', id)
       .select(`
         *,
-        projects!inner(user_id)
+        projects!inner(id, user_id, current_stage)
       `)
+      .eq('id', id)
       .eq('projects.user_id', req.user.userId)
       .single();
 
-    if (error || !conversation) {
-      return res.status(404).json({ error: '对话不存在或更新失败' });
+    if (getError || !conversation) {
+      return res.status(404).json({ error: '对话不存在或无权限访问' });
+    }
+
+    // 如果是需求澄清对话且尚未完成，生成需求总结
+    let requirementSummary = null;
+    let nextStage = null;
+
+    if (conversation.conversation_type === 'requirement_clarification' && !conversation.is_completed) {
+      try {
+        // 使用AI生成需求总结
+        requirementSummary = await qwenService.generateRequirementSummary(conversation.messages);
+        nextStage = 'clarifying'; // 更新项目阶段为需求澄清完成
+        
+        console.log('Generated requirement summary:', requirementSummary.substring(0, 100) + '...');
+      } catch (aiError) {
+        console.error('Failed to generate requirement summary:', aiError);
+        // 即使生成总结失败，也允许完成对话，只是不更新总结
+      }
+    }
+
+    // 更新对话状态
+    const { data: updatedConversation, error: updateConversationError } = await supabase
+      .from('ai_conversations')
+      .update({ is_completed: true })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateConversationError) {
+      console.error('Update conversation error:', updateConversationError);
+      return res.status(500).json({ error: '更新对话状态失败' });
+    }
+
+    // 如果有需求总结，更新项目信息
+    if (requirementSummary && nextStage) {
+      const { error: updateProjectError } = await supabase
+        .from('projects')
+        .update({
+          requirement_summary: requirementSummary,
+          current_stage: nextStage,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', conversation.projects.id);
+
+      if (updateProjectError) {
+        console.error('Update project error:', updateProjectError);
+        // 记录错误但不阻断响应，对话已完成
+      }
     }
 
     res.json({
       message: '对话已完成',
-      conversation
+      conversation: updatedConversation,
+      requirement_summary: requirementSummary
     });
 
   } catch (error) {

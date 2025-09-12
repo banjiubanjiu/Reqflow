@@ -184,7 +184,9 @@
 import type { FormInstance, FormRules } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
 import { useConversationStore } from '@/stores/conversation'
+import { projectApi } from '@/api/project'
 import type { CreateProjectForm } from '@/types'
+import type { ProjectNameSuggestion } from '@/api/project'
 
 const router = useRouter()
 const projectStore = useProjectStore()
@@ -202,7 +204,7 @@ const namingMode = ref<'manual' | 'ai'>('manual')
 
 // 生成名称状态
 const generateingNames = ref(false)
-const suggestedNames = ref<Array<{ name: string; reason: string }>>([])
+const suggestedNames = ref<ProjectNameSuggestion[]>([])
 
 // 项目表单数据
 const projectForm = reactive<CreateProjectForm>({
@@ -260,23 +262,23 @@ const prevStep = () => {
   }
 }
 
-// AI生成项目名称（模拟实现）
+// AI生成项目名称
 const generateNames = async () => {
   generateingNames.value = true
   
   try {
-    // 模拟AI生成（实际应该调用后端API）
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    const response = await projectApi.generateProjectNames({
+      description: projectForm.description
+    })
     
-    const mockSuggestions = [
-      { name: 'EduFlow', reason: '结合教育(Edu)和流程(Flow)，体现在线教育平台的流畅体验' },
-      { name: 'StudyHub', reason: '学习中心的概念，强调平台的核心教育功能' },
-      { name: 'LearnSpace', reason: '学习空间，营造开放的在线学习环境氛围' }
-    ]
+    suggestedNames.value = response.suggestions
     
-    suggestedNames.value = mockSuggestions
-  } catch (error) {
-    ElMessage.error('生成名称失败，请重试')
+    if (response.suggestions.length === 0) {
+      ElMessage.warning('AI未能生成合适的名称建议，请尝试更详细地描述您的项目')
+    }
+  } catch (error: any) {
+    console.error('Generate names error:', error)
+    ElMessage.error(error.response?.data?.error || '生成名称失败，请重试')
   } finally {
     generateingNames.value = false
   }

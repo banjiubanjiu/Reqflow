@@ -210,6 +210,23 @@ const handleCompleteConversation = async () => {
     
     if (result.success) {
       ElMessage.success('对话已结束')
+      
+      // 如果是需求澄清对话且生成了需求总结，显示总结
+      if (result.requirementSummary && conversation.value?.conversation_type === 'requirement_clarification') {
+        ElMessageBox.alert(
+          result.requirementSummary,
+          '需求总结已生成',
+          {
+            confirmButtonText: '确定',
+            type: 'success',
+            showClose: false,
+            customClass: 'requirement-summary-dialog'
+          }
+        ).then(() => {
+          // 总结显示完毕后，跳转到项目详情页
+          router.push(`/project/${projectId.value}`)
+        })
+      }
     } else {
       ElMessage.error(result.message || '结束对话失败')
     }
@@ -428,5 +445,35 @@ onUnmounted(() => {
     transform: translateY(-10px);
     opacity: 1;
   }
+}
+</style>
+
+<style>
+/* 需求总结对话框样式 */
+.requirement-summary-dialog .el-message-box {
+  width: 600px;
+  max-width: 90vw;
+}
+
+.requirement-summary-dialog .el-message-box__content {
+  padding: 20px 24px;
+}
+
+.requirement-summary-dialog .el-message-box__message {
+  font-size: 14px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  color: var(--color-text-primary);
+  max-height: 400px;
+  overflow-y: auto;
+  padding: 16px;
+  background: var(--bg-color-light);
+  border-radius: 6px;
+  border: 1px solid var(--border-color-lighter);
+}
+
+.requirement-summary-dialog .el-message-box__title {
+  color: var(--color-success);
+  font-weight: 600;
 }
 </style>

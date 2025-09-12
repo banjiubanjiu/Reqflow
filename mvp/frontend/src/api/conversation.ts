@@ -28,6 +28,7 @@ export interface ConversationMessageResponse {
 export interface ConversationCompleteResponse {
   message: string
   conversation: Conversation
+  requirement_summary?: string
 }
 
 export const conversationApi = {
