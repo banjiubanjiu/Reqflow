@@ -13,6 +13,8 @@ This is a **specification and planning phase** repository. The actual codebase h
 - `README.md` - Basic project description and pain points addressed
 - `spec/01-需求明确.md` - Detailed requirements specification (in Chinese)
 
+**Important**: All specification and design documents should be placed in the `spec/` directory to keep the project root clean and organized.
+
 ## Key Project Concepts
 
 ### Core Problem Being Solved
