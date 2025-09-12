@@ -86,6 +86,65 @@ class QwenService {
     return await this.chat(messages);
   }
 
+  // 生成对话开场问题
+  async generateInitialQuestion(projectName, projectDescription, conversationType) {
+    if (conversationType === 'requirement_clarification') {
+      const systemPrompt = {
+        role: 'system',
+        content: `你是一个专业的需求分析师。用户刚创建了一个项目，现在需要你主动开始需求澄清对话。
+
+项目信息：
+- 项目名称：${projectName}
+- 项目描述：${projectDescription}
+
+任务要求：
+1. 基于用户的项目描述，提出第一个具体的澄清问题
+2. 问题要具体、有针对性，帮助深入了解需求
+3. 使用友好、专业的语调
+4. 遵循深度遍历原则，从核心功能开始
+5. 避免技术术语，用通俗易懂的语言
+6. 问题要开放式，鼓励用户详细描述
+
+请直接输出你要问的问题，不要添加其他格式或说明。`
+      };
+
+      const messages = [systemPrompt, { 
+        role: 'user', 
+        content: `我想创建一个项目：${projectName}。${projectDescription}` 
+      }];
+      
+      return await this.chat(messages);
+      
+    } else if (conversationType === 'tech_selection') {
+      const systemPrompt = {
+        role: 'system',
+        content: `你是一个技术架构师。现在需要为用户的项目进行技术选型对话。
+
+项目信息：
+- 项目名称：${projectName}
+- 项目描述：${projectDescription}
+
+任务要求：
+1. 主动开始技术选型对话
+2. 询问用户的技术偏好或约束条件
+3. 了解项目规模、用户量、性能要求等
+4. 语调专业但不过于技术化
+5. 优先考虑前后端分离、简单易用的技术栈
+
+请直接输出你要问的第一个问题，不要添加其他格式或说明。`
+      };
+
+      const messages = [systemPrompt, { 
+        role: 'user', 
+        content: `我的项目是：${projectName}。${projectDescription}。现在需要进行技术选型。` 
+      }];
+      
+      return await this.chat(messages);
+    }
+    
+    throw new Error(`Unsupported conversation type: ${conversationType}`);
+  }
+
   // 生成需求总结
   async generateRequirementSummary(conversationMessages) {
     const systemPrompt = {

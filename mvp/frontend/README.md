@@ -16,8 +16,10 @@ ReqFlow项目管理平台MVP版本的前端应用。
 
 - 用户登录/注册认证
 - 项目CRUD管理界面
-- AI需求澄清对话界面
+- AI项目名称生成（支持"换一批"）
+- AI需求澄清对话界面（AI主动发起）
 - AI技术选型建议界面
+- 智能需求总结展示
 - 响应式设计支持
 
 ## 快速启动
@@ -114,10 +116,12 @@ frontend/
 **useProjectStore** - 项目管理
 - 状态: projects, currentProject, loading
 - 方法: fetchProjects, createProject, updateProject, deleteProject
+- 新增: generateProjectNames (AI生成项目名称)
 
 **useConversationStore** - AI对话
 - 状态: currentConversation, loading, sendingMessage
 - 方法: createConversation, sendMessage, completeConversation
+- 特性: AI主动发起对话，完成时自动生成需求总结
 
 ## API集成
 
@@ -173,9 +177,26 @@ VITE_API_BASE_URL=https://your-api-domain.com
 - Safari >= 14
 - Edge >= 88
 
+## 已实现功能
+
+### 智能项目创建
+- AI生成项目名称，提供3个选项及理由
+- 支持"换一批"重新生成名称
+- 手动输入和AI生成两种模式
+
+### AI主动对话
+- 创建对话时AI立即提出第一个问题
+- 基于项目描述生成针对性问题
+- 需求澄清和技术选型两种对话类型
+
+### 智能需求总结
+- 对话完成时AI自动分析对话历史
+- 生成结构化需求总结并展示给用户
+- 自动保存到项目中供后续使用
+
 ## 扩展计划
 
-当前MVP版本支持核心功能，后续可扩展：
+后续可扩展功能：
 
 - Epic/Story需求拆分界面
 - 项目文档导出功能

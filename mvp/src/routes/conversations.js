@@ -68,10 +68,10 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: '项目ID和对话类型不能为空' });
     }
 
-    // 验证项目归属
+    // 验证项目归属并获取项目信息
     const { data: project } = await supabase
       .from('projects')
-      .select('id')
+      .select('id, name, description')
       .eq('id', project_id)
       .eq('user_id', req.user.userId)
       .single();
@@ -80,14 +80,37 @@ router.post('/', async (req, res) => {
       return res.status(404).json({ error: '项目不存在或无权限访问' });
     }
 
-    // 创建对话
+    // 生成AI开场问题
+    let initialQuestion;
+    try {
+      initialQuestion = await qwenService.generateInitialQuestion(
+        project.name, 
+        project.description || '', 
+        conversation_type
+      );
+    } catch (aiError) {
+      console.error('Generate initial question error:', aiError);
+      return res.status(500).json({ 
+        error: 'AI服务调用失败，无法开始对话', 
+        details: aiError.message 
+      });
+    }
+
+    // 创建AI开场消息
+    const aiMessage = {
+      role: 'ai',
+      content: initialQuestion,
+      timestamp: new Date().toISOString()
+    };
+
+    // 创建对话，包含AI的开场消息
     const { data: conversation, error } = await supabase
       .from('ai_conversations')
       .insert([
         {
           project_id,
           conversation_type,
-          messages: [],
+          messages: [aiMessage],
           is_completed: false
         }
       ])
@@ -101,7 +124,8 @@ router.post('/', async (req, res) => {
 
     res.status(201).json({
       message: '对话创建成功',
-      conversation
+      conversation,
+      initial_question: initialQuestion
     });
 
   } catch (error) {
