@@ -57,6 +57,7 @@ Thumbs.db
 # Temporary folders
 tmp/
 temp/
+demo/
 
 # Prisma
 prisma/migrations/dev.db*

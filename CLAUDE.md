@@ -59,6 +59,7 @@ This is a **specification and planning phase** repository. The actual codebase h
 - This is critical to avoid encoding issues in Windows environments (GBK codec errors)
 - Use plain ASCII text only for all generated content
 - Use descriptive text instead of emojis (e.g., "Database Task" instead of "🗄️ Database Task")
+- **Frontend UI Design**: Do NOT use any emojis in UI design (icons are acceptable - use icon libraries like Element Plus icons, Heroicons, etc.)
 
 ### Key Files to Reference
 - `spec/01-需求明确.md` - Complete requirement specification (Chinese)
