@@ -3,7 +3,9 @@
     "allow": [
       "Read(//c/Users/banjiu/.config/**)",
       "Read(//c/Users/banjiu/AppData/Local/**)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(npm create:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []
