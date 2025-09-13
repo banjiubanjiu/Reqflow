@@ -122,13 +122,34 @@ INSERT INTO users (email, password_hash, name) VALUES
 - 操作日志记录
 
 ### 技术选型存储
-暂时用JSONB字段存储，格式：
+用JSONB字段存储表格形式的技术选型结果，格式：
 ```json
 {
-  "frontend": "Vue 3 + TypeScript",
-  "backend": "Node.js + Express", 
-  "database": "Supabase PostgreSQL",
-  "reason": "快速开发，技术栈成熟"
+  "selection_mode": "ai_generated", // "user_defined" | "ai_generated"
+  "tech_choices": [
+    {
+      "category": "前端框架",
+      "technology": "Vue 3 + TypeScript",
+      "reason": "成熟的MVVM框架，TypeScript支持强类型开发"
+    },
+    {
+      "category": "后端框架", 
+      "technology": "Node.js + Express",
+      "reason": "轻量级框架，开发效率高，生态丰富"
+    },
+    {
+      "category": "数据库",
+      "technology": "Supabase PostgreSQL", 
+      "reason": "云数据库服务，内置认证和实时功能"
+    },
+    {
+      "category": "UI组件库",
+      "technology": "Element Plus",
+      "reason": "Vue3专用组件库，组件丰富，文档完善"
+    }
+  ],
+  "created_at": "2024-01-01T10:00:00Z",
+  "ai_suggestions": "优先采用前后端分离架构，使用Swagger UI进行API文档管理"
 }
 ```
 

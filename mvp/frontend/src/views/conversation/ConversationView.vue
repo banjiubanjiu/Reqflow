@@ -56,7 +56,7 @@
           <div v-if="conversationStore.sendingMessage" class="message-wrapper ai">
             <div class="message-item ai-message">
               <div class="message-avatar">
-                <el-icon><Robot /></el-icon>
+                <el-icon><ChatDotRound /></el-icon>
               </div>
               <div class="message-content">
                 <div class="typing-indicator">
@@ -87,27 +87,65 @@
     <!-- 消息输入框 -->
     <div class="message-input-container" v-if="conversation && !isCompleted">
       <div class="input-content">
-        <el-input
-          v-model="messageInput"
-          type="textarea"
-          :rows="3"
-          placeholder="请输入您的回答或问题..."
-          :disabled="conversationStore.sendingMessage"
-          @keydown.enter.ctrl="handleSendMessage"
-          @keydown.enter.meta="handleSendMessage"
-        />
-        <div class="input-actions">
-          <div class="input-hint">
-            <span>Ctrl + Enter 发送</span>
+        <!-- 技术选型模式选择器 -->
+        <div v-if="isTechSelectionMode" class="selection-mode-tabs">
+          <el-radio-group v-model="selectionMode" class="mode-selector">
+            <el-radio value="vibe" size="small">
+              <el-icon><ChatRound /></el-icon>
+              Vibe一下
+            </el-radio>
+            <el-radio value="manual" size="small">
+              <el-icon><Edit /></el-icon>
+              朕说了算
+            </el-radio>
+          </el-radio-group>
+        </div>
+
+        <!-- Vibe一下模式 - 文本输入 -->
+        <div v-if="!isTechSelectionMode || selectionMode === 'vibe'" class="text-input-mode">
+          <el-input
+            v-model="messageInput"
+            type="textarea"
+            :rows="3"
+            :placeholder="isTechSelectionMode ? '描述您希望的技术栈特点，AI将为您推荐合适的技术选型...' : '请输入您的回答或问题...'"
+            :disabled="conversationStore.sendingMessage"
+            @keydown.enter.ctrl="handleSendMessage"
+            @keydown.enter.meta="handleSendMessage"
+          />
+          <div class="input-actions">
+            <div class="input-hint">
+              <span>Ctrl + Enter 发送</span>
+            </div>
+            <el-button 
+              type="primary"
+              :disabled="!canSendMessage"
+              :loading="conversationStore.sendingMessage"
+              @click="handleSendMessage"
+            >
+              {{ isTechSelectionMode && selectionMode === 'vibe' ? '让AI推荐' : '发送' }}
+            </el-button>
           </div>
-          <el-button 
-            type="primary"
-            :disabled="!messageInput.trim()"
-            :loading="conversationStore.sendingMessage"
-            @click="handleSendMessage"
-          >
-            发送
-          </el-button>
+        </div>
+
+        <!-- 朕说了算模式 - 技术选型编辑器 -->
+        <div v-else-if="isTechSelectionMode && selectionMode === 'manual'" class="manual-input-mode">
+          <TechStackEditor 
+            v-model="techStackData"
+            :show-preview="false"
+          />
+          <div class="input-actions">
+            <div class="input-hint">
+              <span>请填写完整的技术选型信息</span>
+            </div>
+            <el-button 
+              type="primary"
+              :disabled="!canSendMessage"
+              :loading="conversationStore.sendingMessage"
+              @click="handleSendMessage"
+            >
+              发送技术选型
+            </el-button>
+          </div>
         </div>
       </div>
     </div>
@@ -115,11 +153,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ChatRound, Edit } from '@element-plus/icons-vue'
+import { ChatDotRound } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'
 import { useConversationStore } from '@/stores/conversation'
 import ChatMessage from '@/components/business/ChatMessage.vue'
+import TechStackEditor from '@/components/business/TechStackEditor.vue'
+import type { TechStackData } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -132,6 +175,12 @@ const conversationId = computed(() => route.params.conversationId as string)
 
 // 消息输入
 const messageInput = ref('')
+
+// 技术选型模式
+const selectionMode = ref<'vibe' | 'manual'>('vibe')
+const techStackData = ref<TechStackData>({
+  tech_choices: []
+})
 
 // 计算属性
 const conversation = computed(() => conversationStore.currentConversation)
@@ -148,6 +197,22 @@ const conversationTitle = computed(() => {
 
 const projectName = computed(() => {
   return projectStore.currentProject?.name || '项目'
+})
+
+// 是否是技术选型对话
+const isTechSelectionMode = computed(() => 
+  conversation.value?.conversation_type === 'tech_selection'
+)
+
+// 是否可以发送消息
+const canSendMessage = computed(() => {
+  if (selectionMode.value === 'vibe') {
+    return messageInput.value.trim().length > 0
+  } else {
+    return techStackData.value.tech_choices.some(choice => 
+      choice.category.trim() && choice.technology.trim()
+    )
+  }
 })
 
 // 方法
@@ -173,18 +238,65 @@ const loadConversation = async () => {
 }
 
 const handleSendMessage = async () => {
-  if (!messageInput.value.trim() || !conversationId.value) return
+  if (!canSendMessage.value || !conversationId.value) return
   
-  const content = messageInput.value.trim()
-  messageInput.value = ''
+  let content: string
+  let backupContent: string = ''
+  let result: any
   
-  const result = await conversationStore.sendMessage(conversationId.value, content)
+  if (isTechSelectionMode.value) {
+    // 技术选型对话：使用专门的技术选型接口
+    if (selectionMode.value === 'vibe') {
+      // Vibe一下模式：发送普通文本
+      content = messageInput.value.trim()
+      backupContent = content
+      messageInput.value = ''
+    } else {
+      // 朕说了算模式：发送JSON数据
+      content = JSON.stringify(techStackData.value)
+      backupContent = content
+    }
+    
+    result = await conversationStore.sendTechSelection(conversationId.value, selectionMode.value, content)
+  } else {
+    // 需求澄清对话：使用普通消息接口
+    content = messageInput.value.trim()
+    backupContent = content
+    messageInput.value = ''
+    
+    result = await conversationStore.sendMessage(conversationId.value, content)
+  }
   
   if (!result.success) {
-    ElMessage.error(result.message || '发送消息失败')
+    // 显示详细错误信息
+    const errorMsg = result.message || '发送消息失败'
+    ElMessage({
+      type: 'error',
+      message: errorMsg,
+      duration: 5000,
+      showClose: true
+    })
+    
     // 恢复输入内容
-    messageInput.value = content
+    if (!isTechSelectionMode.value || selectionMode.value === 'vibe') {
+      messageInput.value = backupContent
+    }
   } else {
+    // 发送成功提示
+    if (isTechSelectionMode.value) {
+      ElMessage({
+        type: 'success',
+        message: selectionMode.value === 'vibe' ? 'AI技术选型生成中...' : '技术选型已发送',
+        duration: 2000
+      })
+    }
+    
+    // 发送成功，如果是手动模式，可以清空表格
+    if (isTechSelectionMode.value && selectionMode.value === 'manual') {
+      // 可选：成功发送后清空表格，或者保留让用户看到已发送的内容
+      // techStackData.value = { tech_choices: [] }
+    }
+    
     // 滚动到底部
     nextTick(() => {
       scrollToBottom()
@@ -386,6 +498,60 @@ onUnmounted(() => {
 .input-hint {
   font-size: 12px;
   color: var(--color-text-placeholder);
+}
+
+/* 技术选型模式选择器 */
+.selection-mode-tabs {
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-color-lighter);
+}
+
+.mode-selector {
+  display: flex;
+  gap: 16px;
+}
+
+.mode-selector .el-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 0;
+  padding: 8px 16px;
+  border: 1px solid var(--border-color-light);
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.mode-selector .el-radio:hover {
+  border-color: var(--color-primary-light-3);
+  background: var(--color-primary-light-9);
+}
+
+.mode-selector .el-radio.is-checked {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light-9);
+  color: var(--color-primary);
+}
+
+.mode-selector .el-radio__label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* 输入模式区域 */
+.text-input-mode,
+.manual-input-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.manual-input-mode .input-actions {
+  margin-top: 0;
 }
 
 /* AI消息加载动画 */

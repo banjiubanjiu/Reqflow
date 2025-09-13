@@ -16,7 +16,7 @@ export interface Project {
   description?: string
   current_stage: 'created' | 'clarifying' | 'tech_selecting' | 'requirement_splitting' | 'completed'
   requirement_summary?: string
-  tech_stack?: Record<string, any>
+  tech_stack?: TechStack
   created_at: string
   updated_at: string
   ai_conversations?: Conversation[]
@@ -71,4 +71,23 @@ export interface RegisterForm {
 export interface CreateProjectForm {
   name: string
   description?: string
+}
+
+// 技术选型相关类型
+export interface TechChoice {
+  category: string
+  technology: string
+  reason: string
+}
+
+export interface TechStackData {
+  tech_choices: TechChoice[]
+  ai_suggestions?: string
+}
+
+export interface TechStack {
+  selection_mode: 'user_defined' | 'ai_generated'
+  tech_choices: TechChoice[]
+  created_at: string
+  ai_suggestions: string
 }

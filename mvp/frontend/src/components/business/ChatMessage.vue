@@ -3,7 +3,7 @@
     <!-- AI消息 -->
     <div v-if="message.role === 'ai' || message.role === 'assistant'" class="message-item ai-message">
       <div class="message-avatar">
-        <el-icon><Robot /></el-icon>
+        <el-icon><ChatDotRound /></el-icon>
       </div>
       <div class="message-content">
         <div class="message-text" v-html="formattedContent"></div>
@@ -26,6 +26,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { ChatDotRound, User } from '@element-plus/icons-vue'
 import type { Message } from '@/types'
 
 interface Props {

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Debug Token</title>
+</head>
+<body>
+    <h1>Token Debug Tool</h1>
+    <div id="token-info"></div>
+    
+    <script>
+        const token = localStorage.getItem('auth_token');
+        const user = localStorage.getItem('auth_user');
+        
+        const tokenInfo = document.getElementById('token-info');
+        
+        if (token) {
+            tokenInfo.innerHTML = `
+                <h3>Token Found:</h3>
+                <p><strong>Token (first 50 chars):</strong> ${token.substring(0, 50)}...</p>
+                <p><strong>Token Length:</strong> ${token.length}</p>
+                <p><strong>User Info:</strong> ${user}</p>
+                
+                <h3>Token Payload (decoded):</h3>
+                <pre id="payload"></pre>
+                
+                <button onclick="testAPI()">Test API Call</button>
+                <div id="api-result"></div>
+            `;
+            
+            // Decode JWT payload
+            try {
+                const payload = JSON.parse(atob(token.split('.')[1]));
+                document.getElementById('payload').textContent = JSON.stringify(payload, null, 2);
+                
+                // Check if token is expired
+                const now = Math.floor(Date.now() / 1000);
+                if (payload.exp < now) {
+                    tokenInfo.innerHTML += '<p style="color: red;"><strong>⚠️ TOKEN IS EXPIRED!</strong></p>';
+                }
+            } catch (e) {
+                tokenInfo.innerHTML += '<p style="color: red;">Failed to decode token payload</p>';
+            }
+        } else {
+            tokenInfo.innerHTML = '<p style="color: red;">No token found in localStorage</p>';
+        }
+        
+        async function testAPI() {
+            const resultDiv = document.getElementById('api-result');
+            
+            try {
+                const response = await fetch('/api/projects', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const data = await response.text();
+                resultDiv.innerHTML = `
+                    <h4>API Response:</h4>
+                    <p><strong>Status:</strong> ${response.status}</p>
+                    <p><strong>Response:</strong></p>
+                    <pre>${data}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

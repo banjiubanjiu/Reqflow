@@ -75,15 +75,246 @@ class QwenService {
     return await this.chat(messages);
   }
 
-  // 技术选型建议
-  async suggestTechStack(requirementSummary) {
+  // AI生成技术选型（Vibe一下模式）
+  async generateTechStack(projectName, projectDescription, requirementSummary) {
     const systemPrompt = {
       role: 'system',
-      content: `基于需求描述，推荐合适的技术栈。以表格形式回复，包含：前端、后端、数据库、选择理由。简洁易懂，避免过度技术化。`
+      content: `你是一个技术架构师。基于项目信息生成合适的技术选型方案。
+
+技术选型原则：
+1. 优先采用前后端分离架构
+2. 必须包含Swagger UI进行API文档管理
+3. 前端必须使用UI组件库（Element Plus、Ant Design等）
+4. 体现"够用就好"理念，避免过度设计
+5. 考虑开发效率和技术成熟度
+
+输出要求：
+- 严格按照表格格式输出
+- 控制在30行以内
+- 每个技术选择都要有具体理由
+- 分类包含：前端框架、后端框架、数据库、UI组件库、部署方案等
+
+请严格按照以下格式输出（不要添加任何其他文字或说明）：
+
+| 分类 | 技术选择 | 选择理由 |
+|------|----------|----------|
+| 前端框架 | Vue 3 + TypeScript | 现代化MVVM框架，TypeScript提供强类型支持 |
+| 后端框架 | Node.js + Express | 轻量级，开发效率高，生态丰富 |
+| 数据库 | Supabase (PostgreSQL) | 云数据库，提供实时API和认证功能 |
+| UI组件库 | Element Plus | 成熟的Vue 3组件库，管理后台风格 |
+| API文档 | Swagger UI | 自动生成API文档，支持在线测试 |
+| 部署方案 | Vercel + Railway | 前端静态托管，后端容器化部署 |
+
+重要：
+1. 必须包含至少6个技术分类
+2. 每行必须严格按照表格格式
+3. 不要添加额外的文字说明
+4. 确保所有"|"符号对齐`
     };
 
-    const messages = [systemPrompt, { role: 'user', content: requirementSummary }];
+    const projectInfo = `项目名称：${projectName}
+项目描述：${projectDescription}
+需求总结：${requirementSummary || '待补充'}`;
+
+    const messages = [systemPrompt, { role: 'user', content: projectInfo }];
     return await this.chat(messages);
+  }
+
+  // AI优化用户技术选型（朕说了算模式）
+  async optimizeTechStack(userTechStack, projectName, requirementSummary) {
+    const systemPrompt = {
+      role: 'system',
+      content: `你是一个技术架构师。用户已经提供了他们的技术选型方案，请给出专业的优化建议。
+
+优化原则：
+1. 尊重用户的技术偏好
+2. 指出潜在问题和改进空间
+3. 推荐更合适的替代方案（如果有）
+4. 确保符合前后端分离、Swagger UI、UI组件库等基本要求
+5. 考虑技术栈之间的兼容性
+
+输出格式：
+- 首先以表格形式展示优化后的技术选型
+- 然后简要说明主要的优化建议和理由
+- 保持建议的实用性和可执行性
+
+请严格按照以下格式输出：
+
+## 优化后的技术选型
+
+| 分类 | 技术选择 | 选择理由 |
+|------|----------|----------|
+| [继续用户的分类，或补充缺失的分类] | [原选择或优化建议] | [具体理由] |
+
+## 优化建议
+- 建议1：具体的优化理由
+- 建议2：技术替换的必要性`
+    };
+
+    const userInput = `项目名称：${projectName}
+需求总结：${requirementSummary || '待补充'}
+用户的技术选型方案：
+${userTechStack}`;
+
+    const messages = [systemPrompt, { role: 'user', content: userInput }];
+    return await this.chat(messages);
+  }
+
+  // 解析AI返回的表格格式技术选型，转换为结构化数据
+  parseTechStackTable(aiResponse, selectionMode = 'ai_generated') {
+    try {
+      const lines = aiResponse.split('\n').filter(line => line.trim());
+      const techChoices = [];
+      let aiSuggestions = '';
+      let isInSuggestions = false;
+      let tableFound = false;
+
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        
+        // 检测优化建议部分
+        if (trimmedLine.includes('## 优化建议') || 
+            trimmedLine.includes('优化建议') ||
+            trimmedLine.includes('## 建议') ||
+            trimmedLine.includes('建议：')) {
+          isInSuggestions = true;
+          continue;
+        }
+        
+        // 收集优化建议
+        if (isInSuggestions && trimmedLine) {
+          aiSuggestions += trimmedLine + '\n';
+          continue;
+        }
+        
+        // 解析表格行 - 更宽松的检测条件
+        if (trimmedLine.includes('|') && !trimmedLine.includes('---')) {
+          const parts = trimmedLine.split('|').map(part => part.trim()).filter(part => part);
+          
+          // 跳过表头
+          if (parts.length >= 3 && 
+              !parts[0].includes('分类') && 
+              !parts[1].includes('技术选择') &&
+              parts[0] && parts[1] && parts[2]) {
+            
+            const [category, technology, reason] = parts;
+            techChoices.push({
+              category: category,
+              technology: technology, 
+              reason: reason
+            });
+            tableFound = true;
+          }
+        }
+      }
+
+      // 如果没有找到表格，尝试从文本中提取技术信息
+      if (!tableFound) {
+        console.log('No table found, trying to extract from text...');
+        const fallbackChoices = this.extractTechFromText(aiResponse);
+        if (fallbackChoices.length > 0) {
+          techChoices.push(...fallbackChoices);
+        }
+      }
+
+      const result = {
+        selection_mode: selectionMode,
+        tech_choices: techChoices.length > 0 ? techChoices : this.getDefaultTechChoices(),
+        created_at: new Date().toISOString(),
+        ai_suggestions: aiSuggestions.trim() || aiResponse
+      };
+
+      console.log('Parsed tech stack:', JSON.stringify(result, null, 2));
+      return result;
+      
+    } catch (error) {
+      console.error('Failed to parse tech stack table:', error);
+      
+      // 返回更有用的备用结构
+      return {
+        selection_mode: selectionMode,
+        tech_choices: this.getDefaultTechChoices(),
+        created_at: new Date().toISOString(),
+        ai_suggestions: aiResponse,
+        parsing_error: true
+      };
+    }
+  }
+
+  // 从文本中提取技术信息的备用方法
+  extractTechFromText(text) {
+    const choices = [];
+    const lines = text.split('\n');
+    
+    // 查找包含技术栈信息的行
+    const techPatterns = [
+      /(?:前端|后端|数据库|UI|框架|库).*?[:：]\s*(.+)/i,
+      /(\w+(?:\s+\w+)*)\s*[-–—]\s*(.+)/,
+      /(Vue|React|Node\.js|Express|MySQL|PostgreSQL|Redis|Docker|Nginx).*?[-–—:]?\s*(.+)/i
+    ];
+    
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      
+      for (const pattern of techPatterns) {
+        const match = trimmed.match(pattern);
+        if (match) {
+          choices.push({
+            category: this.categorizeFromText(match[1] || match[0]),
+            technology: match[1] || match[0],
+            reason: match[2] || '基于AI建议'
+          });
+          break;
+        }
+      }
+    }
+    
+    return choices.slice(0, 8); // 限制数量
+  }
+
+  // 根据文本内容分类技术
+  categorizeFromText(tech) {
+    const tech_lower = tech.toLowerCase();
+    if (tech_lower.includes('vue') || tech_lower.includes('react') || tech_lower.includes('angular')) {
+      return '前端框架';
+    }
+    if (tech_lower.includes('node') || tech_lower.includes('express') || tech_lower.includes('spring')) {
+      return '后端框架';
+    }
+    if (tech_lower.includes('mysql') || tech_lower.includes('postgres') || tech_lower.includes('mongo')) {
+      return '数据库';
+    }
+    if (tech_lower.includes('element') || tech_lower.includes('ant') || tech_lower.includes('ui')) {
+      return 'UI组件库';
+    }
+    return '其他';
+  }
+
+  // 获取默认技术选型（当解析完全失败时使用）
+  getDefaultTechChoices() {
+    return [
+      {
+        category: '前端框架',
+        technology: 'Vue 3 + TypeScript',
+        reason: '现代化MVVM框架，TypeScript提供强类型支持'
+      },
+      {
+        category: '后端框架',
+        technology: 'Node.js + Express',
+        reason: '轻量级，开发效率高，生态丰富'
+      },
+      {
+        category: '数据库',
+        technology: 'Supabase (PostgreSQL)',
+        reason: '云数据库，提供实时API和认证功能'
+      },
+      {
+        category: 'UI组件库',
+        technology: 'Element Plus',
+        reason: '成熟的Vue 3组件库，管理后台风格'
+      }
+    ];
   }
 
   // 生成对话开场问题

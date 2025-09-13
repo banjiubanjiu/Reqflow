@@ -20,10 +20,21 @@ export const useAuthStore = defineStore('auth', () => {
     
     if (savedToken && savedUser) {
       try {
-        token.value = savedToken
-        user.value = JSON.parse(savedUser)
+        // 检查token是否过期
+        const payload = JSON.parse(atob(savedToken.split('.')[1]))
+        const now = Math.floor(Date.now() / 1000)
+        
+        if (payload.exp < now) {
+          // Token已过期，清除认证信息
+          console.log('Token expired, clearing auth')
+          clearAuth()
+        } else {
+          // Token有效，设置认证状态
+          token.value = savedToken
+          user.value = JSON.parse(savedUser)
+        }
       } catch (error) {
-        console.error('Failed to parse saved user:', error)
+        console.error('Failed to parse saved token or user:', error)
         clearAuth()
       }
     }

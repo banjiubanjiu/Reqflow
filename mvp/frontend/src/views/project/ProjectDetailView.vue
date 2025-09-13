@@ -68,26 +68,7 @@
           <!-- 技术栈 -->
           <div v-if="project.tech_stack" class="info-section">
             <h2>技术选型</h2>
-            <div class="info-card">
-              <div class="tech-stack">
-                <div v-if="project.tech_stack.frontend" class="tech-item">
-                  <label>前端：</label>
-                  <span>{{ project.tech_stack.frontend }}</span>
-                </div>
-                <div v-if="project.tech_stack.backend" class="tech-item">
-                  <label>后端：</label>
-                  <span>{{ project.tech_stack.backend }}</span>
-                </div>
-                <div v-if="project.tech_stack.database" class="tech-item">
-                  <label>数据库：</label>
-                  <span>{{ project.tech_stack.database }}</span>
-                </div>
-                <div v-if="project.tech_stack.reason" class="tech-item">
-                  <label>选择理由：</label>
-                  <span>{{ project.tech_stack.reason }}</span>
-                </div>
-              </div>
-            </div>
+            <TechStackDisplay :tech-stack="project.tech_stack" />
           </div>
 
           <!-- 对话历史 -->
@@ -197,8 +178,10 @@
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useProjectStore } from '@/stores/project'
 import { useConversationStore } from '@/stores/conversation'
+import TechStackDisplay from '@/components/business/TechStackDisplay.vue'
 import type { Project, Conversation, Message } from '@/types'
 
 const route = useRoute()
@@ -431,27 +414,6 @@ onMounted(async () => {
   margin: 0;
 }
 
-.tech-stack {
-  display: grid;
-  gap: 12px;
-}
-
-.tech-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.tech-item label {
-  font-weight: 600;
-  color: var(--color-text-primary);
-  min-width: 60px;
-}
-
-.tech-item span {
-  color: var(--color-text-regular);
-  flex: 1;
-}
 
 .conversations-list {
   display: flex;

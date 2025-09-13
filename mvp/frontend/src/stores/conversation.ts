@@ -67,9 +67,50 @@ export const useConversationStore = defineStore('conversation', () => {
       }
     } catch (error: any) {
       console.error('Send message error:', error)
+      
+      // 处理超时错误
+      if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
+        return { 
+          success: false, 
+          message: 'AI处理超时，请稍后重试。如果是技术选型请求，AI可能需要更长时间分析。' 
+        }
+      }
+      
       return { 
         success: false, 
         message: error.response?.data?.error || error.response?.data?.details || '发送消息失败' 
+      }
+    } finally {
+      sendingMessage.value = false
+    }
+  }
+
+  // 技术选型专用方法
+  const sendTechSelection = async (conversationId: string, mode: 'vibe' | 'manual', content: string) => {
+    sendingMessage.value = true
+    try {
+      const response = await conversationApi.techSelection(conversationId, { mode, content })
+      
+      if (response.conversation) {
+        currentConversation.value = response.conversation
+        return { success: true, aiReply: response.ai_reply, mode: response.mode }
+      } else {
+        throw new Error('Invalid response format')
+      }
+    } catch (error: any) {
+      console.error('Send tech selection error:', error)
+      
+      // 处理超时错误
+      if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
+        return { 
+          success: false, 
+          message: 'AI技术选型处理超时，请稍后重试。AI正在分析您的需求，可能需要更长时间。' 
+        }
+      }
+      
+      return { 
+        success: false, 
+        message: error.response?.data?.error || error.response?.data?.details || '技术选型处理失败' 
       }
     } finally {
       sendingMessage.value = false
@@ -117,6 +158,7 @@ export const useConversationStore = defineStore('conversation', () => {
     createConversation,
     fetchConversation,
     sendMessage,
+    sendTechSelection,
     completeConversation,
     clearConversation
   }

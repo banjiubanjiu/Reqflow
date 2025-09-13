@@ -54,6 +54,14 @@ This is a **specification and planning phase** repository. The actual codebase h
 4. **Ensure interface contract compliance** - Both Epic-level and Story-level contracts must be enforced
 5. **Support parallel development workflows** - The architecture should enable independent development of different components
 
+### Server Management
+- **DO NOT restart the development server automatically** - The MVP project uses hot deployment (nodemon)
+- **DO NOT start any services (backend/frontend) without user confirmation** - Always ask first before starting new services
+- The user will manually start/stop servers as needed
+- Do not use `taskkill` or similar commands to kill Node.js processes
+- If testing API endpoints, assume the server is already running
+- Check existing running services before proposing to start new ones
+
 ### Code Style and Encoding Guidelines
 - **IMPORTANT**: Do NOT use any emojis or special Unicode characters in code, comments, or documentation
 - This is critical to avoid encoding issues in Windows environments (GBK codec errors)
