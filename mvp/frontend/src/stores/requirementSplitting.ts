@@ -180,10 +180,14 @@ export const useRequirementSplittingStore = defineStore('requirementSplitting', 
       const response = await requirementSplittingApi.confirmEpics(currentProjectId.value, selectedEpics)
       
       if (response.epics) {
+        // 重置所有相关状态
         epics.value = response.epics
+        stories.value = [] // 清空之前的Story
         currentStep.value = 'story_processing'
         currentEpicIndex.value = 0
         currentEpicStoryStep.value = 'generating'
+        
+        console.log('Epic确认成功，新的Epic列表:', response.epics.map(e => ({ id: e.id, name: e.name })))
         return { success: true, epics: response.epics }
       } else {
         throw new Error('Invalid response format')
@@ -227,6 +231,14 @@ export const useRequirementSplittingStore = defineStore('requirementSplitting', 
   const confirmStories = async (epicId: string, selectedStories: Story[]) => {
     loading.value = true
     try {
+      // 验证Epic ID是否有效
+      const epic = epics.value.find(e => e.id === epicId)
+      if (!epic) {
+        console.error('Epic ID not found in current epics:', epicId)
+        console.error('Available epics:', epics.value.map(e => ({ id: e.id, name: e.name })))
+        throw new Error(`Epic不存在：${epicId}`)
+      }
+      
       const response = await requirementSplittingApi.confirmStories(epicId, selectedStories)
       
       if (response.stories) {
