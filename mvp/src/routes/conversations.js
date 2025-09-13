@@ -263,7 +263,8 @@ router.post('/:id/tech-selection', async (req, res) => {
         aiReply = await qwenService.generateTechStack(
           conversation.projects.name || '项目',
           conversation.projects.description || '',
-          conversation.projects.requirement_summary || '待补充'
+          conversation.projects.requirement_summary || '待补充',
+          content // 传递用户的技术偏好或要求
         );
       } else {
         // 朕说了算模式 - AI优化建议

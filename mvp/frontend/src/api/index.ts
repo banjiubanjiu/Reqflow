@@ -63,8 +63,21 @@ api.interceptors.response.use(
     } else if (error.request) {
       // 网络错误或超时
       if (error.code === 'ECONNABORTED') {
+        // 根据URL判断具体的AI任务类型
+        const url = error.config?.url || ''
+        let taskName = 'AI处理'
+        if (url.includes('requirement-splitting')) {
+          taskName = '需求拆分'
+        } else if (url.includes('tech-selection')) {
+          taskName = '技术选型'
+        } else if (url.includes('generate-epics')) {
+          taskName = 'Epic生成'
+        } else if (url.includes('conversations')) {
+          taskName = 'AI对话'
+        }
+        
         ElMessage.error({
-          message: 'AI处理超时，需求拆分是复杂任务，可能需要2-3分钟。请稍后重试。',
+          message: `${taskName}超时，这是复杂的AI任务，通常需要1-2分钟。请稍后重试，或刷新页面重新开始。`,
           duration: 8000
         })
       } else {

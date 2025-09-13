@@ -76,22 +76,29 @@ class QwenService {
   }
 
   // AI生成技术选型（Vibe一下模式）
-  async generateTechStack(projectName, projectDescription, requirementSummary) {
+  async generateTechStack(projectName, projectDescription, requirementSummary, userPreferences = '') {
     const systemPrompt = {
       role: 'system',
-      content: `你是一个技术架构师。基于项目信息生成合适的技术选型方案。
+      content: `你是一个技术架构师。基于项目信息和用户偏好生成合适的技术选型方案。
 
 技术选型原则：
-1. 优先采用前后端分离架构
-2. 必须包含Swagger UI进行API文档管理
-3. 前端必须使用UI组件库（Element Plus、Ant Design等）
-4. 体现"够用就好"理念，避免过度设计
-5. 考虑开发效率和技术成熟度
+1. **优先考虑用户的技术偏好和要求**
+2. 优先采用前后端分离架构
+3. 必须包含Swagger UI进行API文档管理
+4. 前端必须使用UI组件库（Element Plus、Ant Design等）
+5. 体现"够用就好"理念，避免过度设计
+6. 考虑开发效率和技术成熟度
+
+重要说明：
+- 如果用户明确指定了某种技术栈或框架，必须优先采用
+- 如果用户表达了性能、规模、团队技能等偏好，要据此调整技术选择
+- 如果用户提到了成本、部署等关注点，要在选择理由中体现
+- 当用户偏好与基本原则冲突时，优先满足用户偏好
 
 输出要求：
 - 严格按照表格格式输出
 - 控制在30行以内
-- 每个技术选择都要有具体理由
+- 每个技术选择都要有具体理由（结合用户偏好说明）
 - 分类包含：前端框架、后端框架、数据库、UI组件库、部署方案等
 
 请严格按照以下格式输出（不要添加任何其他文字或说明）：
@@ -112,11 +119,17 @@ class QwenService {
 4. 确保所有"|"符号对齐`
     };
 
-    const projectInfo = `项目名称：${projectName}
+    const userMessage = `项目信息：
+项目名称：${projectName}
 项目描述：${projectDescription}
-需求总结：${requirementSummary || '待补充'}`;
+需求总结：${requirementSummary || '待补充'}
 
-    const messages = [systemPrompt, { role: 'user', content: projectInfo }];
+用户的技术偏好和要求：
+${userPreferences || '无特殊偏好，请根据项目特点推荐最合适的技术栈'}
+
+请基于以上信息生成技术选型方案，优先考虑用户的偏好和要求。`;
+
+    const messages = [systemPrompt, { role: 'user', content: userMessage }];
     return await this.chat(messages);
   }
 
