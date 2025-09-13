@@ -7,6 +7,9 @@ require('dotenv').config();
 const authRoutes = require('./routes/auth');
 const projectRoutes = require('./routes/projects');
 const conversationRoutes = require('./routes/conversations');
+const requirementSplittingRoutes = require('./routes/requirementSplitting');
+const epicsRoutes = require('./routes/epics');
+const storiesRoutes = require('./routes/stories');
 const testRoutes = require('./routes/test');
 
 const app = express();
@@ -23,6 +26,9 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/conversations', conversationRoutes);
+app.use('/api', requirementSplittingRoutes);
+app.use('/api', epicsRoutes);
+app.use('/api', storiesRoutes);
 app.use('/api/test', testRoutes);
 
 // 健康检查

@@ -212,6 +212,105 @@ router.get('/:id', async (req, res) => {
 
 /**
  * @swagger
+ * /api/projects/{id}/tech-selection:
+ *   post:
+ *     tags: [项目管理]
+ *     summary: 完成技术选型
+ *     description: 完成项目的技术选型，更新项目状态和技术栈
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 项目ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - tech_stack
+ *             properties:
+ *               tech_stack:
+ *                 type: object
+ *                 description: 技术栈配置
+ *     responses:
+ *       200:
+ *         description: 技术选型完成成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 project:
+ *                   $ref: '#/components/schemas/Project'
+ *       400:
+ *         description: 请求参数错误
+ *       404:
+ *         description: 项目不存在
+ *       500:
+ *         description: 服务器错误
+ */
+router.post('/:id/tech-selection', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { tech_stack } = req.body;
+
+    if (!tech_stack) {
+      return res.status(400).json({ error: '技术栈配置不能为空' });
+    }
+
+    // 检查项目是否存在且属于当前用户
+    const { data: project, error: getError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', req.user.userId)
+      .single();
+
+    if (getError || !project) {
+      return res.status(404).json({ error: '项目不存在或无权限访问' });
+    }
+
+    // 检查项目状态
+    if (project.current_stage !== 'tech_selecting') {
+      return res.status(400).json({ error: '项目当前状态不允许完成技术选型' });
+    }
+
+    // 更新项目状态和技术栈
+    const { data: updatedProject, error: updateError } = await supabase
+      .from('projects')
+      .update({
+        current_stage: 'requirement_splitting',
+        tech_stack: tech_stack,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Update project tech selection error:', updateError);
+      return res.status(500).json({ error: '更新项目技术选型失败' });
+    }
+
+    res.json({
+      message: '技术选型完成成功',
+      project: updatedProject
+    });
+
+  } catch (error) {
+    console.error('Complete tech selection error:', error);
+    res.status(500).json({ error: '完成技术选型失败' });
+  }
+});
+
+/**
+ * @swagger
  * /api/projects/{id}:
  *   put:
  *     tags: [项目管理]

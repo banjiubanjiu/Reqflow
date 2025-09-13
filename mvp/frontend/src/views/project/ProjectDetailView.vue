@@ -16,9 +16,9 @@
               返回项目列表
             </el-button>
             <div class="project-info">
-              <h1>{{ project.name }}</h1>
-              <el-tag :type="stageConfig.type" size="small">
-                {{ stageConfig.label }}
+              <h1>{{ project?.name || '加载中...' }}</h1>
+              <el-tag :type="stageConfig?.type || 'info'" size="small">
+                {{ stageConfig?.label || '未知状态' }}
               </el-tag>
             </div>
           </div>
@@ -44,21 +44,21 @@
             <div class="info-card">
               <div class="info-item">
                 <label>项目描述：</label>
-                <p>{{ project.description || '暂无描述' }}</p>
+                <p>{{ project?.description || '暂无描述' }}</p>
               </div>
               <div class="info-item">
                 <label>创建时间：</label>
-                <p>{{ formatDate(project.created_at) }}</p>
+                <p>{{ project?.created_at ? formatDate(project.created_at) : '加载中...' }}</p>
               </div>
               <div class="info-item">
                 <label>更新时间：</label>
-                <p>{{ formatDate(project.updated_at) }}</p>
+                <p>{{ project?.updated_at ? formatDate(project.updated_at) : '加载中...' }}</p>
               </div>
             </div>
           </div>
 
           <!-- 需求总结 -->
-          <div v-if="project.requirement_summary" class="info-section">
+          <div v-if="project?.requirement_summary" class="info-section">
             <h2>需求总结</h2>
             <div class="info-card">
               <p class="requirement-text">{{ project.requirement_summary }}</p>
@@ -66,7 +66,7 @@
           </div>
 
           <!-- 技术栈 -->
-          <div v-if="project.tech_stack" class="info-section">
+          <div v-if="project?.tech_stack" class="info-section">
             <h2>技术选型</h2>
             <TechStackDisplay :tech-stack="project.tech_stack" />
           </div>
@@ -124,7 +124,7 @@
             <h2>快速操作</h2>
             <div class="actions-grid">
               <el-button 
-                v-if="project.current_stage === 'created'"
+                v-if="project?.current_stage === 'created'"
                 type="primary" 
                 size="large"
                 @click="startNewConversation"
@@ -144,7 +144,17 @@
               </el-button>
               
               <el-button 
-                v-if="project.current_stage === 'completed'"
+                v-if="canStartRequirementSplitting"
+                type="primary" 
+                size="large"
+                @click="startRequirementSplitting"
+              >
+                <el-icon><Grid /></el-icon>
+                开始需求拆分
+              </el-button>
+              
+              <el-button 
+                v-if="project?.current_stage === 'completed'"
                 type="success" 
                 size="large"
                 @click="exportDocument"
@@ -179,6 +189,7 @@
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowLeft, Edit, Delete, ChatDotRound, Setting, Grid, Download } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'
 import { useConversationStore } from '@/stores/conversation'
 import TechStackDisplay from '@/components/business/TechStackDisplay.vue'
@@ -203,18 +214,29 @@ const stageConfigs = {
   created: { label: '已创建', type: 'info' },
   clarifying: { label: '需求澄清中', type: 'warning' },
   tech_selecting: { label: '技术选型中', type: 'warning' },
+  tech_selected: { label: '技术选型完成', type: 'success' },
   requirement_splitting: { label: '需求拆分中', type: 'warning' },
   completed: { label: '已完成', type: 'success' }
 } as const
 
-const stageConfig = computed(() => 
-  project.value ? stageConfigs[project.value.current_stage] : stageConfigs.created
-)
+const stageConfig = computed(() => {
+  if (!project.value) return stageConfigs.created
+  
+  const stage = project.value.current_stage
+  return stageConfigs[stage] || stageConfigs.created
+})
 
 const canStartTechSelection = computed(() => 
   project.value && 
   project.value.current_stage === 'clarifying' && 
   project.value.requirement_summary
+)
+
+const canStartRequirementSplitting = computed(() => 
+  project.value && 
+  (project.value.current_stage === 'tech_selected' || project.value.current_stage === 'requirement_splitting') &&
+  project.value.requirement_summary && 
+  project.value.tech_stack
 )
 
 // 方法
@@ -258,6 +280,10 @@ const startTechSelection = async () => {
   } else {
     ElMessage.error(result.message || '创建技术选型对话失败')
   }
+}
+
+const startRequirementSplitting = () => {
+  router.push(`/project/${projectId.value}/requirement-splitting`)
 }
 
 const handleEdit = () => {

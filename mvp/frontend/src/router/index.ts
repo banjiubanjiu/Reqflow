@@ -55,6 +55,20 @@ const router = createRouter({
       props: true
     },
     {
+      path: '/project/:id/requirement-splitting',
+      name: 'RequirementSplitting',
+      component: () => import('@/views/project/RequirementSplittingView.vue'),
+      meta: { requiresAuth: true },
+      props: true
+    },
+    {
+      path: '/project/:id/results',
+      name: 'RequirementSplittingResults',
+      component: () => import('@/views/project/RequirementSplittingResultsView.vue'),
+      meta: { requiresAuth: true },
+      props: true
+    },
+    {
       path: '/:pathMatch(.*)*',
       redirect: '/home'
     }

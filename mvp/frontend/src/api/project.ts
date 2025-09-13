@@ -65,5 +65,10 @@ export const projectApi = {
   // AI生成项目名称建议
   generateProjectNames: (data: GenerateNamesRequest): Promise<GenerateNamesResponse> => {
     return api.post('/projects/generate-names', data)
+  },
+
+  // 完成技术选型
+  completeTechSelection: (id: string, techStack: any): Promise<{ message: string; project: Project }> => {
+    return api.post(`/projects/${id}/tech-selection`, { tech_stack: techStack })
   }
 }

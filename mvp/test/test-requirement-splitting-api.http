@@ -1,0 +1,380 @@
+# ReqFlow 需求拆分功能 API 测试
+# 使用前请确保后端服务运行在 http://localhost:3000
+# 需要先登录获取 JWT token
+
+### 变量定义
+@baseUrl = http://localhost:3000/api
+@token = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI3NmEyNGU2Mi01MDk4LTQyYTItOWZmZS1mNGExZGRkYWZiM2UiLCJlbWFpbCI6IjE1MTczNzM3NDI3QHRlc3QuY29tIiwiaWF0IjoxNzU3NzI5NTcwLCJleHAiOjE3NTgzMzQzNzB9.Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8Ej8
+@projectId = 请替换为实际的项目ID
+@epicId = 请替换为实际的Epic ID
+@storyId = 请替换为实际的Story ID
+
+### 1. 用户登录 (获取token)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "15173737427@test.com",
+  "password": "12345678"
+}
+
+### 2. 获取项目列表 (找到有需求总结和技术选型的项目)
+GET {{baseUrl}}/projects
+Authorization: Bearer {{token}}
+
+### 3. 开始需求拆分
+POST {{baseUrl}}/projects/{{projectId}}/requirement-splitting/start
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+### 4. 获取需求拆分会话
+GET {{baseUrl}}/projects/{{projectId}}/requirement-splitting/session
+Authorization: Bearer {{token}}
+
+### 5. 重新生成Epic建议
+POST {{baseUrl}}/projects/{{projectId}}/epics/generate
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "feedback": "请生成更详细的Epic拆分，包含更多业务领域"
+}
+
+### 6. 确认Epic拆分
+PUT {{baseUrl}}/projects/{{projectId}}/epics/confirm
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "epics": [
+    {
+      "name": "用户管理系统",
+      "description": "负责用户注册、登录、权限管理等核心功能",
+      "service_boundary": "用户认证、权限控制、用户信息管理",
+      "dependencies": [],
+      "capabilities": [
+        {
+          "endpoint_prefix": "/api/auth/*",
+          "description": "用户认证相关接口"
+        },
+        {
+          "endpoint_prefix": "/api/users/*",
+          "description": "用户信息管理接口"
+        }
+      ],
+      "domain_models": [
+        {
+          "name": "User",
+          "fields": ["id", "email", "name", "role", "status"]
+        },
+        {
+          "name": "Session",
+          "fields": ["token", "user_id", "expires_at"]
+        }
+      ],
+      "integration_contracts": [
+        "其他服务通过JWT token验证用户身份",
+        "用户信息查询统一通过用户服务接口"
+      ],
+      "priority": 1
+    },
+    {
+      "name": "项目管理系统",
+      "description": "负责项目创建、管理、状态跟踪等功能",
+      "service_boundary": "项目CRUD、项目状态管理、项目成员管理",
+      "dependencies": ["用户管理系统"],
+      "capabilities": [
+        {
+          "endpoint_prefix": "/api/projects/*",
+          "description": "项目管理相关接口"
+        }
+      ],
+      "domain_models": [
+        {
+          "name": "Project",
+          "fields": ["id", "name", "description", "owner_id", "status"]
+        }
+      ],
+      "integration_contracts": [
+        "项目操作需要用户认证",
+        "项目权限通过用户服务验证"
+      ],
+      "priority": 2
+    }
+  ]
+}
+
+### 7. 获取项目的Epic列表
+GET {{baseUrl}}/projects/{{projectId}}/epics
+Authorization: Bearer {{token}}
+
+### 8. 获取Epic详情
+GET {{baseUrl}}/epics/{{epicId}}
+Authorization: Bearer {{token}}
+
+### 9. 为Epic生成Story建议
+POST {{baseUrl}}/epics/{{epicId}}/stories/generate
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+### 10. 确认Epic的Story拆分
+PUT {{baseUrl}}/epics/{{epicId}}/stories/confirm
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stories": [
+    {
+      "title": "用户登录功能",
+      "user_story": "作为用户，我希望能够通过邮箱和密码登录系统，以便访问个人功能",
+      "backend_api": {
+        "endpoint": "POST /api/auth/login",
+        "request_schema": {
+          "email": {"type": "string", "format": "email", "required": true},
+          "password": {"type": "string", "minLength": 6, "required": true}
+        },
+        "response_schema": {
+          "success_200": {
+            "access_token": "string",
+            "user": {"id": "string", "email": "string", "name": "string"}
+          },
+          "error_401": {
+            "message": "邮箱或密码错误"
+          }
+        },
+        "business_rules": [
+          "密码错误3次后锁定账户5分钟",
+          "JWT token有效期24小时"
+        ]
+      },
+      "database_design": {
+        "tables": [
+          {
+            "name": "users",
+            "fields": ["id(UUID)", "email(VARCHAR)", "password_hash(VARCHAR)", "name(VARCHAR)", "status(ENUM)"],
+            "indexes": ["email(UNIQUE)", "status"]
+          }
+        ]
+      },
+      "frontend_specification": {
+        "components": [
+          {
+            "component": "LoginForm",
+            "layout": "居中卡片布局，最大宽度400px",
+            "fields": [
+              {"email": {"type": "input", "placeholder": "请输入邮箱"}},
+              {"password": {"type": "password", "placeholder": "请输入密码"}}
+            ]
+          }
+        ],
+        "routes": [
+          {"path": "/login", "component": "LoginPage"}
+        ],
+        "state_management": {
+          "store": "authStore",
+          "state": ["user", "isLoggedIn", "loginLoading"]
+        }
+      },
+      "acceptance_criteria": {
+        "functional": [
+          "用户输入正确的邮箱和密码，能够成功登录",
+          "用户输入错误的邮箱或密码，显示错误提示"
+        ],
+        "ui": [
+          "登录表单居中显示，最大宽度400px",
+          "输入框有合适的placeholder和验证提示"
+        ],
+        "performance": [
+          "登录接口响应时间不超过2秒",
+          "页面加载时间不超过3秒"
+        ],
+        "compatibility": [
+          "支持主流浏览器最新版本",
+          "移动端适配"
+        ],
+        "error_handling": [
+          "网络错误时显示友好提示",
+          "服务器错误时显示重试选项"
+        ],
+        "security": [
+          "密码传输加密",
+          "防止暴力破解"
+        ]
+      },
+      "mock_contracts": {
+        "POST /api/auth/login": {
+          "success_response": {
+            "access_token": "mock_jwt_token_xxxxx",
+            "user": {"id": "uuid-1234", "email": "test@example.com", "name": "测试用户"}
+          }
+        }
+      },
+      "estimated_hours": 8,
+      "priority": 1
+    },
+    {
+      "title": "用户注册功能",
+      "user_story": "作为新用户，我希望能够注册账号，以便使用系统功能",
+      "backend_api": {
+        "endpoint": "POST /api/auth/register",
+        "request_schema": {
+          "email": {"type": "string", "format": "email", "required": true},
+          "password": {"type": "string", "minLength": 8, "required": true},
+          "name": {"type": "string", "required": true}
+        },
+        "response_schema": {
+          "success_201": {
+            "message": "注册成功",
+            "user": {"id": "string", "email": "string", "name": "string"}
+          },
+          "error_400": {
+            "message": "邮箱已存在"
+          }
+        },
+        "business_rules": [
+          "邮箱必须唯一",
+          "密码至少8位字符"
+        ]
+      },
+      "database_design": {
+        "tables": [
+          {
+            "name": "users",
+            "fields": ["id(UUID)", "email(VARCHAR)", "password_hash(VARCHAR)", "name(VARCHAR)", "created_at(TIMESTAMP)"],
+            "indexes": ["email(UNIQUE)"]
+          }
+        ]
+      },
+      "frontend_specification": {
+        "components": [
+          {
+            "component": "RegisterForm",
+            "layout": "居中卡片布局，最大宽度400px",
+            "fields": [
+              {"email": {"type": "input", "placeholder": "请输入邮箱"}},
+              {"password": {"type": "password", "placeholder": "请输入密码"}},
+              {"name": {"type": "input", "placeholder": "请输入姓名"}}
+            ]
+          }
+        ],
+        "routes": [
+          {"path": "/register", "component": "RegisterPage"}
+        ],
+        "state_management": {
+          "store": "authStore",
+          "state": ["registerLoading"]
+        }
+      },
+      "acceptance_criteria": {
+        "functional": [
+          "用户输入有效信息，能够成功注册",
+          "邮箱已存在时显示错误提示"
+        ],
+        "ui": [
+          "注册表单居中显示，最大宽度400px",
+          "密码强度指示器"
+        ],
+        "performance": [
+          "注册接口响应时间不超过3秒"
+        ],
+        "compatibility": [
+          "支持主流浏览器最新版本"
+        ],
+        "error_handling": [
+          "网络错误时显示友好提示"
+        ],
+        "security": [
+          "密码加密存储",
+          "邮箱格式验证"
+        ]
+      },
+      "mock_contracts": {
+        "POST /api/auth/register": {
+          "success_response": {
+            "message": "注册成功",
+            "user": {"id": "uuid-5678", "email": "newuser@example.com", "name": "新用户"}
+          }
+        }
+      },
+      "estimated_hours": 6,
+      "priority": 2
+    }
+  ]
+}
+
+### 11. 获取Epic的Story列表
+GET {{baseUrl}}/epics/{{epicId}}/stories
+Authorization: Bearer {{token}}
+
+### 12. 获取Story详情
+GET {{baseUrl}}/stories/{{storyId}}
+Authorization: Bearer {{token}}
+
+### 13. 更新Epic信息
+PUT {{baseUrl}}/epics/{{epicId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "用户管理系统 (更新版)",
+  "description": "负责用户注册、登录、权限管理等核心功能 - 已更新",
+  "status": "in_progress",
+  "priority": 1
+}
+
+### 14. 更新Story信息
+PUT {{baseUrl}}/stories/{{storyId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "用户登录功能 (更新版)",
+  "status": "in_progress",
+  "estimated_hours": 10,
+  "priority": 1
+}
+
+### 15. 导出Story为Markdown
+GET {{baseUrl}}/stories/{{storyId}}/export
+Authorization: Bearer {{token}}
+
+### 16. 删除Story (谨慎操作)
+# DELETE {{baseUrl}}/stories/{{storyId}}
+# Authorization: Bearer {{token}}
+
+### 17. 删除Epic (谨慎操作)
+# DELETE {{baseUrl}}/epics/{{epicId}}
+# Authorization: Bearer {{token}}
+
+### 测试错误情况
+
+### 18. 尝试对不存在的项目开始拆分
+POST {{baseUrl}}/projects/00000000-0000-0000-0000-000000000000/requirement-splitting/start
+Authorization: Bearer {{token}}
+
+### 19. 尝试访问其他用户的Epic
+GET {{baseUrl}}/epics/00000000-0000-0000-0000-000000000000
+Authorization: Bearer {{token}}
+
+### 20. 无效的Epic确认数据
+PUT {{baseUrl}}/projects/{{projectId}}/epics/confirm
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "epics": []
+}
+
+### 21. 无效的Story确认数据
+PUT {{baseUrl}}/epics/{{epicId}}/stories/confirm
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "stories": [
+    {
+      "title": "",
+      "user_story": ""
+    }
+  ]
+}

@@ -82,6 +82,9 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { MoreFilled, View, Edit, Delete, Monitor, Document } from '@element-plus/icons-vue'
 import type { Project } from '@/types'
 
 interface Props {
@@ -103,12 +106,16 @@ const stageConfigs = {
   created: { label: '已创建', type: 'info', progress: 0 },
   clarifying: { label: '需求澄清中', type: 'warning', progress: 25 },
   tech_selecting: { label: '技术选型中', type: 'warning', progress: 50 },
+  tech_selected: { label: '技术选型完成', type: 'success', progress: 60 },
   requirement_splitting: { label: '需求拆分中', type: 'warning', progress: 75 },
   completed: { label: '已完成', type: 'success', progress: 100 }
 } as const
 
 // 计算属性
-const stageConfig = computed(() => stageConfigs[props.project.current_stage])
+const stageConfig = computed(() => {
+  const stage = props.project.current_stage as keyof typeof stageConfigs
+  return stageConfigs[stage] || stageConfigs.created
+})
 
 const progressPercentage = computed(() => stageConfig.value.progress)
 
@@ -141,6 +148,8 @@ const continueButtonText = computed(() => {
       return '继续需求澄清'
     case 'tech_selecting':
       return '继续技术选型'
+    case 'tech_selected':
+      return '开始需求拆分'
     case 'requirement_splitting':
       return '继续需求拆分'
     default:
@@ -185,6 +194,12 @@ const handleContinue = () => {
   } else if (stage === 'tech_selecting') {
     // 跳转到技术选型
     router.push(`/project/${props.project.id}/conversation`)
+  } else if (stage === 'tech_selected') {
+    // 跳转到需求拆分
+    router.push(`/project/${props.project.id}/requirement-splitting`)
+  } else if (stage === 'requirement_splitting') {
+    // 跳转到需求拆分
+    router.push(`/project/${props.project.id}/requirement-splitting`)
   } else {
     // 跳转到项目详情
     router.push(`/project/${props.project.id}`)

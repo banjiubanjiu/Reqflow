@@ -308,42 +308,107 @@ const handleCompleteConversation = async () => {
   if (!conversationId.value) return
   
   try {
+    const confirmText = isTechSelectionMode.value 
+      ? '确定要完成技术选型吗？完成后将进入需求拆分阶段。'
+      : '确定要结束当前对话吗？结束后将无法继续添加消息。'
+    
+    const confirmTitle = isTechSelectionMode.value ? '完成技术选型' : '结束对话'
+    
     await ElMessageBox.confirm(
-      '确定要结束当前对话吗？结束后将无法继续添加消息。',
-      '结束对话',
+      confirmText,
+      confirmTitle,
       {
-        confirmButtonText: '确定结束',
+        confirmButtonText: isTechSelectionMode.value ? '完成技术选型' : '确定结束',
         cancelButtonText: '取消',
         type: 'warning'
       }
     )
     
-    const result = await conversationStore.completeConversation(conversationId.value)
-    
-    if (result.success) {
-      ElMessage.success('对话已结束')
-      
-      // 如果是需求澄清对话且生成了需求总结，显示总结
-      if (result.requirementSummary && conversation.value?.conversation_type === 'requirement_clarification') {
-        ElMessageBox.alert(
-          result.requirementSummary,
-          '需求总结已生成',
-          {
-            confirmButtonText: '确定',
-            type: 'success',
-            showClose: false,
-            customClass: 'requirement-summary-dialog'
-          }
-        ).then(() => {
-          // 总结显示完毕后，跳转到项目详情页
-          router.push(`/project/${projectId.value}`)
-        })
-      }
+    if (isTechSelectionMode.value) {
+      // 技术选型对话：需要提取技术栈并完成技术选型
+      await handleCompleteTechSelection()
     } else {
-      ElMessage.error(result.message || '结束对话失败')
+      // 需求澄清对话：使用原有逻辑
+      const result = await conversationStore.completeConversation(conversationId.value)
+      
+      if (result.success) {
+        ElMessage.success('对话已结束')
+        
+        // 如果是需求澄清对话且生成了需求总结，显示总结
+        if (result.requirementSummary) {
+          ElMessageBox.alert(
+            result.requirementSummary,
+            '需求总结已生成',
+            {
+              confirmButtonText: '确定',
+              type: 'success',
+              showClose: false,
+              customClass: 'requirement-summary-dialog'
+            }
+          ).then(() => {
+            // 总结显示完毕后，跳转到项目详情页
+            router.push(`/project/${projectId.value}`)
+          })
+        } else {
+          router.push(`/project/${projectId.value}`)
+        }
+      } else {
+        ElMessage.error(result.message || '结束对话失败')
+      }
     }
   } catch (error) {
     // 用户取消
+  }
+}
+
+const handleCompleteTechSelection = async () => {
+  if (!conversation.value || !projectId.value) return
+  
+  try {
+    // 从对话消息中提取技术栈信息
+    const techStack = extractTechStackFromConversation()
+    
+    if (!techStack) {
+      ElMessage.error('无法从对话中提取技术栈信息，请确保已进行技术选型讨论')
+      return
+    }
+    
+    // 调用项目store的完成技术选型方法
+    const result = await projectStore.completeTechSelection(projectId.value, techStack)
+    
+    if (result.success) {
+      // 同时完成对话
+      await conversationStore.completeConversation(conversationId.value)
+      
+      ElMessage.success('技术选型完成，项目已进入需求拆分阶段')
+      
+      // 跳转到项目详情页
+      router.push(`/project/${projectId.value}`)
+    } else {
+      ElMessage.error(result.message || '完成技术选型失败')
+    }
+  } catch (error: any) {
+    console.error('Complete tech selection error:', error)
+    ElMessage.error('完成技术选型失败')
+  }
+}
+
+const extractTechStackFromConversation = () => {
+  if (!conversation.value) return null
+  
+  // 查找最后一条AI消息，尝试从中提取技术栈
+  const aiMessages = conversation.value.messages.filter(m => m.role === 'ai')
+  if (aiMessages.length === 0) return null
+  
+  const lastAiMessage = aiMessages[aiMessages.length - 1]
+  
+  // 简单的技术栈提取逻辑，实际应该更智能
+  // 这里假设AI消息中包含了技术选型信息
+  return {
+    selection_mode: 'ai_generated',
+    tech_choices: [], // 这里应该解析AI消息内容
+    created_at: new Date().toISOString(),
+    ai_suggestions: lastAiMessage.content
   }
 }
 

@@ -125,6 +125,35 @@ export const useProjectStore = defineStore('project', () => {
     }
   }
 
+  // 完成技术选型
+  const completeTechSelection = async (id: string, techStack: any) => {
+    loading.value = true
+    try {
+      const response = await projectApi.completeTechSelection(id, techStack)
+      
+      // 更新当前项目
+      if (currentProject.value?.id === id) {
+        currentProject.value = response.project
+      }
+      
+      // 更新项目列表中的项目
+      const index = projects.value.findIndex(p => p.id === id)
+      if (index >= 0) {
+        projects.value[index] = response.project
+      }
+      
+      return { success: true, project: response.project }
+    } catch (error: any) {
+      console.error('Complete tech selection error:', error)
+      return { 
+        success: false, 
+        message: error.response?.data?.error || '完成技术选型失败' 
+      }
+    } finally {
+      loading.value = false
+    }
+  }
+
   // 清除状态
   const clearProjects = () => {
     projects.value = []
@@ -143,6 +172,7 @@ export const useProjectStore = defineStore('project', () => {
     fetchProject,
     updateProject,
     deleteProject,
+    completeTechSelection,
     clearProjects
   }
 })

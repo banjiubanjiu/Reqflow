@@ -1,26 +1,15 @@
-# ReqFlow MVP Frontend
+# ReqFlow Frontend
 
-ReqFlow项目管理平台MVP版本的前端应用。
+ReqFlow项目管理平台的前端应用，基于Vue 3 + TypeScript构建。
 
 ## 技术栈
 
-- **框架**: Vue 3 + Composition API + `<script setup>`
-- **类型**: TypeScript (严格模式)
+- **框架**: Vue 3 + TypeScript + Composition API
+- **UI库**: Element Plus
+- **状态管理**: Pinia
+- **路由**: Vue Router 4
 - **构建工具**: Vite
-- **UI库**: Element Plus + 自定义主题
-- **状态管理**: Pinia (模块化设计)
-- **路由**: Vue Router 4 (权限守卫)
-- **HTTP**: Axios (拦截器+JWT管理)
-
-## 核心功能
-
-- 用户登录/注册认证
-- 项目CRUD管理界面
-- AI项目名称生成（支持"换一批"）
-- AI需求澄清对话界面（AI主动发起）
-- AI技术选型建议界面
-- 智能需求总结展示
-- 响应式设计支持
+- **HTTP客户端**: Axios
 
 ## 快速启动
 
@@ -39,168 +28,148 @@ npm run dev
 npm run build
 ```
 
-### 4. 类型检查
-```bash
-npm run type-check
-```
+## 核心功能
 
-### 5. 预览构建结果
-```bash
-npm run preview
-```
+### 用户认证
+- 用户登录/注册
+- JWT token自动管理
+- 路由权限守卫
+- token过期自动检测和清理
+
+### 项目管理
+- 项目列表展示（卡片式布局）
+- 项目创建向导
+- 项目状态跟踪
+- AI项目名称生成
+
+### AI对话系统
+- **需求澄清对话**: 多轮对话澄清项目需求
+- **技术选型对话**: 支持两种模式
+  - Vibe一下：AI自动推荐技术方案
+  - 朕说了算：用户自定义技术选型，AI提供优化建议
+
+### 技术选型可视化
+- 技术选型结果卡片式展示
+- 分类图标和颜色编码
+- 用户技术选型结构化预览
+- AI建议高亮显示
 
 ## 项目结构
 
 ```
-frontend/
-├── public/                 # 静态资源
-├── src/
-│   ├── api/               # API接口封装
-│   │   ├── index.ts       # Axios配置和拦截器
-│   │   ├── auth.ts        # 认证相关接口
-│   │   ├── project.ts     # 项目管理接口
-│   │   └── conversation.ts # AI对话接口
-│   ├── components/        # 组件库
-│   │   └── business/      # 业务组件
-│   │       ├── ProjectCard.vue    # 项目卡片
-│   │       └── ChatMessage.vue    # 聊天消息
-│   ├── views/            # 页面组件
-│   │   ├── auth/         # 认证页面
-│   │   ├── home/         # 首页
-│   │   ├── project/      # 项目管理页面
-│   │   └── conversation/ # 对话页面
-│   ├── stores/           # Pinia状态管理
-│   │   ├── auth.ts       # 用户认证状态
-│   │   ├── project.ts    # 项目管理状态
-│   │   └── conversation.ts # 对话状态
-│   ├── router/           # 路由配置
-│   ├── types/            # TypeScript类型定义
-│   ├── utils/            # 工具函数
-│   ├── styles/           # 全局样式
-│   └── main.ts           # 应用入口
-├── package.json
-├── vite.config.ts        # Vite配置
-└── tsconfig.json         # TypeScript配置
+src/
+├── api/              # API接口封装
+│   ├── auth.ts       # 认证相关接口
+│   ├── project.ts    # 项目管理接口
+│   ├── conversation.ts # 对话接口
+│   └── index.ts      # Axios配置和拦截器
+├── components/       # 通用组件
+│   └── business/     # 业务组件
+│       ├── ChatMessage.vue      # 聊天消息组件
+│       ├── ProjectCard.vue      # 项目卡片组件
+│       └── TechStackEditor.vue  # 技术选型编辑器
+├── stores/           # Pinia状态管理
+│   ├── auth.ts       # 认证状态
+│   ├── project.ts    # 项目状态
+│   └── conversation.ts # 对话状态
+├── views/            # 页面组件
+│   ├── auth/         # 认证页面
+│   ├── home/         # 首页
+│   ├── project/      # 项目相关页面
+│   └── conversation/ # 对话页面
+├── router/           # 路由配置
+├── types/            # TypeScript类型定义
+└── styles/           # 全局样式
 ```
-
-## 页面路由
-
-| 路径 | 页面 | 描述 | 权限要求 |
-|------|------|------|----------|
-| `/login` | 登录页 | 用户登录 | 游客 |
-| `/register` | 注册页 | 用户注册 | 游客 |
-| `/home` | 首页 | 项目列表 | 认证用户 |
-| `/project/create` | 创建项目 | 新建项目向导 | 认证用户 |
-| `/project/:id` | 项目详情 | 项目信息和操作 | 认证用户 |
-| `/project/:id/conversation/:conversationId?` | AI对话 | 需求澄清/技术选型 | 认证用户 |
 
 ## 核心组件
 
-### 业务组件
+### ChatMessage
+智能消息显示组件，支持：
+- 普通文本消息渲染
+- 技术选型消息卡片式展示
+- 用户技术选型结构化预览
+- Markdown格式支持
 
-**ProjectCard.vue** - 项目卡片组件
-- Props: project (Project)
-- Events: view, edit, delete
-- 功能: 显示项目基本信息、进度、快捷操作
+### TechStackEditor
+技术选型编辑器，支持：
+- 可编辑表格形式
+- 预定义技术分类
+- 动态添加/删除行
+- 实时数据验证
 
-**ChatMessage.vue** - 聊天消息组件
-- Props: message (Message)
-- 功能: 渲染AI和用户消息，支持Markdown格式
-
-### 状态管理
-
-**useAuthStore** - 用户认证
-- 状态: user, token, loading, initialized
-- 方法: login, register, logout, initializeAuth
-
-**useProjectStore** - 项目管理
-- 状态: projects, currentProject, loading
-- 方法: fetchProjects, createProject, updateProject, deleteProject
-- 新增: generateProjectNames (AI生成项目名称)
-
-**useConversationStore** - AI对话
-- 状态: currentConversation, loading, sendingMessage
-- 方法: createConversation, sendMessage, completeConversation
-- 特性: AI主动发起对话，完成时自动生成需求总结
+### ProjectCard
+项目卡片组件，支持：
+- 项目状态标签
+- 进度条显示
+- 快捷操作按钮
 
 ## API集成
 
-前端通过Axios与后端API通信，支持：
+### 认证流程
+```typescript
+// 登录
+const result = await authStore.login({ email, password })
 
-- 自动JWT token管理
-- 请求/响应拦截器
-- 统一错误处理
-- 自动重定向到登录页
-- API代理配置（开发环境）
+// 自动token管理
+// Axios拦截器自动添加Bearer token
+// token过期自动跳转登录页
+```
+
+### 技术选型对话
+```typescript
+// Vibe一下模式
+await conversationStore.sendTechSelection(
+  conversationId, 
+  'vibe', 
+  '我希望使用现代化技术栈'
+)
+
+// 朕说了算模式
+await conversationStore.sendTechSelection(
+  conversationId, 
+  'manual', 
+  JSON.stringify(techStackData)
+)
+```
 
 ## 开发规范
 
-### 代码风格
-- 组件使用PascalCase命名
-- 函数和变量使用camelCase
-- 常量使用UPPER_CASE
+### 组件命名
+- 组件文件：PascalCase (UserProfile.vue)
+- 组件实例：kebab-case (<user-profile />)
+
+### 状态管理
+- 使用Pinia进行状态管理
+- 按功能模块划分store
+- 异步操作统一错误处理
+
+### 类型定义
 - 严格TypeScript类型检查
+- API响应类型定义
+- 组件Props类型定义
 
-### 组件规范
-- 使用Composition API + `<script setup>`
-- 明确的Props和Emits类型定义
-- 响应式数据使用ref/reactive
-- 计算属性使用computed
+## 环境配置
 
-### 样式规范
-- 基于Element Plus主题
-- CSS变量定义全局色彩
-- 组件样式使用scoped
-- 响应式设计优先移动端
+开发环境默认配置：
+- 前端端口：5173
+- 后端代理：http://localhost:3000
+- API超时：60秒（AI请求）
 
-## 部署配置
+## 特色功能
 
-### 环境变量
-```bash
-# 开发环境
-VITE_API_BASE_URL=http://localhost:3000
+### 智能消息渲染
+- 自动检测技术选型消息格式
+- 动态解析表格数据为卡片展示
+- 技术分类图标和颜色编码
 
-# 生产环境  
-VITE_API_BASE_URL=https://your-api-domain.com
-```
+### 响应式设计
+- 移动端友好布局
+- 自适应卡片网格
+- 触摸友好的交互设计
 
-### 构建优化
-- 路由级代码分割
-- Element Plus按需导入
-- 自动导入Vue和Pinia
-- TypeScript严格模式
-
-## 浏览器支持
-
-- Chrome >= 87
-- Firefox >= 78  
-- Safari >= 14
-- Edge >= 88
-
-## 已实现功能
-
-### 智能项目创建
-- AI生成项目名称，提供3个选项及理由
-- 支持"换一批"重新生成名称
-- 手动输入和AI生成两种模式
-
-### AI主动对话
-- 创建对话时AI立即提出第一个问题
-- 基于项目描述生成针对性问题
-- 需求澄清和技术选型两种对话类型
-
-### 智能需求总结
-- 对话完成时AI自动分析对话历史
-- 生成结构化需求总结并展示给用户
-- 自动保存到项目中供后续使用
-
-## 扩展计划
-
-后续可扩展功能：
-
-- Epic/Story需求拆分界面
-- 项目文档导出功能
-- 团队协作功能
-- 项目模板功能
-- 实时消息推送
-- 移动端适配优化
+### 用户体验优化
+- Loading状态管理
+- 错误信息友好提示
+- 操作反馈和确认
+- 自动滚动到消息底部

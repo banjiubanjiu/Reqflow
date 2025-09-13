@@ -101,6 +101,10 @@ CREATE INDEX idx_conversations_type ON ai_conversations(conversation_type);
 ```
 users (1) -----> (N) projects
 projects (1) --> (N) ai_conversations
+projects (1) --> (N) requirement_splitting_sessions
+projects (1) --> (N) epics
+epics (1) -----> (N) stories
+projects (1) --> (N) stories (冗余关系，便于查询)
 ```
 
 ## 初始化数据
@@ -112,44 +116,57 @@ INSERT INTO users (email, password_hash, name) VALUES
 ('15173737427@test.com', '$2b$12$hashed_password_here', '测试用户');
 ```
 
-## MVP版本限制
+## 扩展功能
+
+### 需求拆分功能 (已添加)
+- Epic/Story两层拆分架构
+- 完整的技术实现规格存储
+- AI智能拆分建议
+- 并行开发支持
 
 ### 暂不包含的功能
-- Epic/Story详细拆分存储 (后续版本添加)
 - 团队成员管理
 - 权限控制
 - 文件上传存储
 - 操作日志记录
 
 ### 技术选型存储
-用JSONB字段存储表格形式的技术选型结果，格式：
+用JSONB字段存储表格形式的技术选型结果，支持两种模式：
+
+**AI生成模式 (ai_generated)**:
 ```json
 {
-  "selection_mode": "ai_generated", // "user_defined" | "ai_generated"
+  "selection_mode": "ai_generated",
   "tech_choices": [
     {
       "category": "前端框架",
-      "technology": "Vue 3 + TypeScript",
-      "reason": "成熟的MVVM框架，TypeScript支持强类型开发"
+      "technology": "Vue 3 + TypeScript", 
+      "reason": "现代化MVVM框架，TypeScript支持强类型开发"
     },
     {
-      "category": "后端框架", 
+      "category": "后端框架",
       "technology": "Node.js + Express",
       "reason": "轻量级框架，开发效率高，生态丰富"
-    },
-    {
-      "category": "数据库",
-      "technology": "Supabase PostgreSQL", 
-      "reason": "云数据库服务，内置认证和实时功能"
-    },
-    {
-      "category": "UI组件库",
-      "technology": "Element Plus",
-      "reason": "Vue3专用组件库，组件丰富，文档完善"
     }
   ],
   "created_at": "2024-01-01T10:00:00Z",
   "ai_suggestions": "优先采用前后端分离架构，使用Swagger UI进行API文档管理"
+}
+```
+
+**用户自定义模式 (user_defined)**:
+```json
+{
+  "selection_mode": "user_defined",
+  "tech_choices": [
+    {
+      "category": "前端框架",
+      "technology": "React + TypeScript",
+      "reason": "团队熟悉React生态"
+    }
+  ],
+  "created_at": "2024-01-01T10:00:00Z", 
+  "ai_suggestions": "建议添加UI组件库如Ant Design，提升开发效率"
 }
 ```
 
@@ -198,13 +215,69 @@ WHERE p.id = $1 AND p.user_id = $2
 GROUP BY p.id;
 ```
 
+## 需求拆分表结构
+
+### 4. Epic表 (epics)
+```sql
+CREATE TABLE epics (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name VARCHAR(200) NOT NULL,
+  description TEXT,
+  service_boundary TEXT NOT NULL,
+  dependencies JSONB DEFAULT '[]',
+  capabilities JSONB DEFAULT '[]',
+  domain_models JSONB DEFAULT '[]',
+  integration_contracts JSONB DEFAULT '[]',
+  priority INTEGER DEFAULT 1,
+  status VARCHAR(50) DEFAULT 'not_started',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+### 5. Story表 (stories)
+```sql
+CREATE TABLE stories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  epic_id UUID NOT NULL REFERENCES epics(id) ON DELETE CASCADE,
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  title VARCHAR(300) NOT NULL,
+  user_story TEXT NOT NULL,
+  backend_api JSONB NOT NULL,
+  database_design JSONB NOT NULL,
+  frontend_specification JSONB NOT NULL,
+  acceptance_criteria JSONB NOT NULL,
+  mock_contracts JSONB DEFAULT '{}',
+  priority INTEGER DEFAULT 1,
+  status VARCHAR(50) DEFAULT 'not_started',
+  estimated_hours INTEGER,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
+### 6. 需求拆分会话表 (requirement_splitting_sessions)
+```sql
+CREATE TABLE requirement_splitting_sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  ai_analysis JSONB,
+  epic_suggestions JSONB DEFAULT '[]',
+  story_suggestions JSONB DEFAULT '[]',
+  user_feedback JSONB DEFAULT '[]',
+  is_completed BOOLEAN DEFAULT false,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+```
+
 ## 扩展计划
 
 后续版本可以添加：
-- `epics` 表
-- `stories` 表  
-- `project_members` 表
+- `project_members` 表（团队成员管理）
 - `ai_prompts` 表（存储提示词模板）
 - `export_logs` 表（导出记录）
+- `task_dependencies` 表（任务依赖关系）
 
-这样的MVP设计足够支撑核心功能开发，同时为后续扩展预留了空间。
+详细的需求拆分功能设计请参考 `数据库设计-需求拆分扩展.md`。

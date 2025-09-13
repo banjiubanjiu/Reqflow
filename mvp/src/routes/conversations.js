@@ -640,7 +640,7 @@ router.put('/:id/complete', async (req, res) => {
             }
             
             if (techStackData) {
-              nextStage = 'tech_selecting'; // 更新项目阶段为技术选型完成
+              nextStage = 'tech_selected'; // 更新项目阶段为技术选型已完成
               console.log('Tech stack data:', JSON.stringify(techStackData, null, 2));
             }
           }
