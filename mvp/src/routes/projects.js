@@ -276,9 +276,13 @@ router.post('/:id/tech-selection', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: '项目不存在或无权限访问' });
     }
 
-    // 检查项目状态
-    if (project.current_stage !== 'tech_selecting') {
-      return res.status(400).json({ error: '项目当前状态不允许完成技术选型' });
+    // 检查项目状态 - 允许从tech_selecting或tech_selected状态完成技术选型
+    if (project.current_stage !== 'tech_selecting' && project.current_stage !== 'tech_selected') {
+      return res.status(400).json({ 
+        error: '项目当前状态不允许完成技术选型',
+        current_stage: project.current_stage,
+        expected_stages: ['tech_selecting', 'tech_selected']
+      });
     }
 
     // 更新项目状态和技术栈

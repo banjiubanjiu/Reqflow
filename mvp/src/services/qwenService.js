@@ -33,7 +33,7 @@ class QwenService {
           'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json'
         },
-        timeout: 30000
+        timeout: 90000 // 增加到90秒，为AI处理复杂任务留出更多时间
       });
 
       console.log('Qwen API Response status:', response.status);

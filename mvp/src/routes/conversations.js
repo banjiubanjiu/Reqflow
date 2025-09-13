@@ -122,15 +122,37 @@ router.post('/', async (req, res) => {
       return res.status(500).json({ error: '创建对话失败' });
     }
 
-    res.status(201).json({
+    // 根据对话类型更新项目状态
+    let newStage;
+    if (conversation_type === 'requirement_clarification') {
+      newStage = 'clarifying';
+    } else if (conversation_type === 'tech_selection') {
+      newStage = 'tech_selecting';
+    }
+
+    if (newStage) {
+      const { error: updateError } = await supabase
+        .from('projects')
+        .update({ 
+          current_stage: newStage,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', project_id);
+
+      if (updateError) {
+        console.error('Update project stage error:', updateError);
+        // 不返回错误，因为对话已经创建成功
+      }
+    }
+
+    res.json({
       message: '对话创建成功',
-      conversation,
-      initial_question: initialQuestion
+      conversation
     });
 
   } catch (error) {
     console.error('Create conversation error:', error);
-    res.status(500).json({ error: '服务器内部错误' });
+    res.status(500).json({ error: '创建对话失败' });
   }
 });
 
@@ -139,11 +161,7 @@ router.post('/', async (req, res) => {
  * /api/conversations/{id}/tech-selection:
  *   post:
  *     tags: [AI对话]
- *     summary: 技术选型专用接口
- *     description: |
- *       专门处理技术选型对话，支持两种模式：
- *       - Vibe一下模式：发送文本描述，AI生成技术选型表格
- *       - 朕说了算模式：发送JSON格式的技术选型数据，AI提供优化建议
+ *     summary: 技术选型
  *     security:
  *       - BearerAuth: []
  *     parameters:
@@ -153,7 +171,7 @@ router.post('/', async (req, res) => {
  *         schema:
  *           type: string
  *           format: uuid
- *         description: 技术选型对话ID
+ *         description: 对话ID
  *     requestBody:
  *       required: true
  *       content:
@@ -167,17 +185,32 @@ router.post('/', async (req, res) => {
  *               mode:
  *                 type: string
  *                 enum: [vibe, manual]
- *                 description: 选型模式
+ *                 description: 技术选型模式
  *               content:
  *                 type: string
- *                 description: 消息内容（文本或JSON字符串）
+ *                 description: 用户输入内容
  *     responses:
  *       200:
- *         description: 技术选型处理成功
+ *         description: 技术选型成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 conversation:
+ *                   type: object
+ *                 ai_reply:
+ *                   type: string
+ *                 mode:
+ *                   type: string
  *       400:
  *         description: 请求参数错误
  *       404:
  *         description: 对话不存在
+ *       500:
+ *         description: 服务器错误
  */
 router.post('/:id/tech-selection', async (req, res) => {
   try {
@@ -292,6 +325,50 @@ router.post('/:id/tech-selection', async (req, res) => {
     res.status(500).json({ error: '技术选型处理失败' });
   }
 });
+
+/**
+ * @swagger
+ * /api/conversations/{id}/tech-selection:
+ *   post:
+ *     tags: [AI对话]
+ *     summary: 技术选型专用接口
+ *     description: |
+ *       专门处理技术选型对话，支持两种模式：
+ *       - Vibe一下模式：发送文本描述，AI生成技术选型表格
+ *       - 朕说了算模式：发送JSON格式的技术选型数据，AI提供优化建议
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: 技术选型对话ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - mode
+ *               - content
+ *             properties:
+ *               mode:
+ *                 type: string
+ *                 enum: [vibe, manual]
+ *                 description: 选型模式
+ *               content:
+ *                 type: string
+ *                 description: 消息内容（文本或JSON字符串）
+ *     responses:
+ *       200:
+ *         description: 技术选型处理成功
+ *       400:
+ *         description: 请求参数错误
+ */
 
 /**
  * @swagger

@@ -10,18 +10,42 @@ export const useRequirementSplittingStore = defineStore('requirementSplitting', 
   const stories = ref<Story[]>([])
   const currentProjectId = ref<string>('')
   const loading = ref(false)
-  const currentStep = ref<'epic_suggestion' | 'epic_confirm' | 'story_generation' | 'story_confirm' | 'completed'>('epic_suggestion')
+  const currentStep = ref<'epic_suggestion' | 'epic_confirm' | 'story_processing' | 'completed'>('epic_suggestion')
+  const currentEpicIndex = ref(0)
+  const currentEpicStoryStep = ref<'generating' | 'confirming' | 'completed'>('generating')
 
   // 计算属性
   const hasSession = computed(() => !!currentSession.value)
   const epicSuggestions = computed(() => currentSession.value?.epic_suggestions || [])
   const storySuggestions = computed(() => currentSession.value?.story_suggestions || [])
   
+  // 当前正在处理的Epic
+  const currentEpic = computed(() => {
+    if (currentStep.value === 'story_processing' && epics.value.length > 0) {
+      return epics.value[currentEpicIndex.value] || null
+    }
+    return null
+  })
+  
+  // Story处理进度
+  const storyProgress = computed(() => {
+    if (epics.value.length === 0) return { current: 0, total: 0, percentage: 0 }
+    
+    const completedEpics = currentEpicIndex.value
+    const totalEpics = epics.value.length
+    const percentage = totalEpics > 0 ? Math.round((completedEpics / totalEpics) * 100) : 0
+    
+    return {
+      current: completedEpics,
+      total: totalEpics,
+      percentage
+    }
+  })
+  
   const progressSteps = computed(() => [
     { key: 'epic_suggestion', label: 'Epic建议', completed: currentStep.value !== 'epic_suggestion' },
-    { key: 'epic_confirm', label: 'Epic确认', completed: ['story_generation', 'story_confirm', 'completed'].includes(currentStep.value) },
-    { key: 'story_generation', label: 'Story生成', completed: ['story_confirm', 'completed'].includes(currentStep.value) },
-    { key: 'story_confirm', label: 'Story确认', completed: currentStep.value === 'completed' },
+    { key: 'epic_confirm', label: 'Epic确认', completed: ['story_processing', 'completed'].includes(currentStep.value) },
+    { key: 'story_processing', label: 'Story拆分', completed: currentStep.value === 'completed' },
     { key: 'completed', label: '完成', completed: currentStep.value === 'completed' }
   ])
 
@@ -57,23 +81,50 @@ export const useRequirementSplittingStore = defineStore('requirementSplitting', 
     try {
       const response = await requirementSplittingApi.getSession(projectId)
       
-      if (response && response.session) {
-        currentSession.value = response.session
-        currentProjectId.value = projectId
-        
-        // 根据会话状态确定当前步骤
-        if (response.session.is_completed) {
-          currentStep.value = 'completed'
-        } else if (response.session.story_suggestions?.length > 0) {
-          currentStep.value = 'story_confirm'
-        } else {
-          currentStep.value = 'epic_suggestion'
-        }
-        
-        return { success: true, session: response.session }
-      } else {
-        throw new Error('Invalid response format')
+      // 检查response是否是有效对象
+      if (!response) {
+        console.error('Response is null or undefined')
+        throw new Error('Response is null or undefined')
       }
+      
+      if (typeof response !== 'object') {
+        console.error('Response is not an object, got:', typeof response)
+        throw new Error('Response is not an object')
+      }
+      
+      if (!('session' in response)) {
+        console.error('Response does not have session property, keys:', Object.keys(response))
+        throw new Error('Response missing session property')
+      }
+      
+      currentSession.value = response.session
+      currentProjectId.value = projectId
+      
+      // 如果session为null，说明还没有创建拆分会话
+      if (!response.session) {
+        currentStep.value = 'epic_suggestion'
+        return { success: true, session: null, notFound: true }
+      }
+      
+      // 根据会话状态确定当前步骤
+      if (response.session.is_completed) {
+        currentStep.value = 'completed'
+      } else if (epics.value.length > 0) {
+        currentStep.value = 'story_processing'
+        // 确定当前处理的Epic
+        const completedEpics = epics.value.filter(epic => 
+          stories.value.some(story => story.epic_id === epic.id)
+        )
+        currentEpicIndex.value = completedEpics.length
+        
+        if (currentEpicIndex.value < epics.value.length) {
+          currentEpicStoryStep.value = response.session.story_suggestions?.length > 0 ? 'confirming' : 'generating'
+        }
+      } else {
+        currentStep.value = 'epic_suggestion'
+      }
+      
+      return { success: true, session: response.session }
     } catch (error: any) {
       console.error('Fetch session error:', error)
       
@@ -130,7 +181,9 @@ export const useRequirementSplittingStore = defineStore('requirementSplitting', 
       
       if (response.epics) {
         epics.value = response.epics
-        currentStep.value = 'story_generation'
+        currentStep.value = 'story_processing'
+        currentEpicIndex.value = 0
+        currentEpicStoryStep.value = 'generating'
         return { success: true, epics: response.epics }
       } else {
         throw new Error('Invalid response format')
@@ -154,7 +207,7 @@ export const useRequirementSplittingStore = defineStore('requirementSplitting', 
       
       if (response.story_suggestions && currentSession.value) {
         currentSession.value.story_suggestions = response.story_suggestions
-        currentStep.value = 'story_confirm'
+        currentEpicStoryStep.value = 'confirming'
         return { success: true, suggestions: response.story_suggestions }
       } else {
         throw new Error('Invalid response format')
@@ -179,13 +232,19 @@ export const useRequirementSplittingStore = defineStore('requirementSplitting', 
       if (response.stories) {
         stories.value = [...stories.value, ...response.stories]
         
-        // 检查是否所有Epic都完成了Story拆分
-        const allEpicsCompleted = epics.value.every(epic => 
-          stories.value.some(story => story.epic_id === epic.id)
-        )
+        // 当前Epic完成，移动到下一个Epic
+        currentEpicIndex.value++
         
-        if (allEpicsCompleted) {
+        // 检查是否所有Epic都完成了Story拆分
+        if (currentEpicIndex.value >= epics.value.length) {
           currentStep.value = 'completed'
+        } else {
+          // 重置当前Epic的Story步骤
+          currentEpicStoryStep.value = 'generating'
+          // 清空story_suggestions为下一个Epic准备
+          if (currentSession.value) {
+            currentSession.value.story_suggestions = []
+          }
         }
         
         return { success: true, stories: response.stories }
@@ -298,6 +357,33 @@ export const useRequirementSplittingStore = defineStore('requirementSplitting', 
     }
   }
 
+  // 跳过当前Epic
+  const skipCurrentEpic = () => {
+    if (currentStep.value === 'story_processing' && currentEpicIndex.value < epics.value.length) {
+      currentEpicIndex.value++
+      
+      if (currentEpicIndex.value >= epics.value.length) {
+        currentStep.value = 'completed'
+      } else {
+        currentEpicStoryStep.value = 'generating'
+        if (currentSession.value) {
+          currentSession.value.story_suggestions = []
+        }
+      }
+    }
+  }
+
+  // 返回上一个Epic
+  const goToPreviousEpic = () => {
+    if (currentStep.value === 'story_processing' && currentEpicIndex.value > 0) {
+      currentEpicIndex.value--
+      currentEpicStoryStep.value = 'generating'
+      if (currentSession.value) {
+        currentSession.value.story_suggestions = []
+      }
+    }
+  }
+
   // 清除状态
   const clearState = () => {
     currentSession.value = null
@@ -305,6 +391,8 @@ export const useRequirementSplittingStore = defineStore('requirementSplitting', 
     stories.value = []
     currentProjectId.value = ''
     currentStep.value = 'epic_suggestion'
+    currentEpicIndex.value = 0
+    currentEpicStoryStep.value = 'generating'
   }
 
   // 设置当前步骤
@@ -320,12 +408,16 @@ export const useRequirementSplittingStore = defineStore('requirementSplitting', 
     currentProjectId,
     loading,
     currentStep,
+    currentEpicIndex,
+    currentEpicStoryStep,
     
     // 计算属性
     hasSession,
     epicSuggestions,
     storySuggestions,
     progressSteps,
+    currentEpic,
+    storyProgress,
     
     // 方法
     startSplitting,
@@ -337,6 +429,8 @@ export const useRequirementSplittingStore = defineStore('requirementSplitting', 
     fetchEpics,
     fetchStories,
     exportStory,
+    skipCurrentEpic,
+    goToPreviousEpic,
     clearState,
     setCurrentStep
   }

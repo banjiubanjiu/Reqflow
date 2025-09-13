@@ -186,24 +186,56 @@ router.get('/projects/:id/requirement-splitting/session', async (req, res) => {
   try {
     const { id: projectId } = req.params;
 
-    // 获取最新的拆分会话
-    const { data: session, error } = await supabase
-      .from('requirement_splitting_sessions')
-      .select(`
-        *,
-        projects!inner(user_id, name, description, requirement_summary, tech_stack)
-      `)
-      .eq('project_id', projectId)
-      .eq('projects.user_id', req.user.userId)
-      .order('created_at', { ascending: false })
-      .limit(1)
+    // 首先直接获取项目信息进行权限检查
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('*')
+      .eq('id', projectId)
+      .eq('user_id', req.user.userId)
       .single();
 
-    if (error || !session) {
-      return res.status(404).json({ error: '需求拆分会话不存在' });
+    if (projectError || !project) {
+      console.error('Get project error:', {
+        projectId,
+        userId: req.user.userId,
+        error: projectError
+      });
+      return res.status(404).json({ 
+        error: '项目不存在或无权限访问',
+        projectId,
+        userId: req.user.userId
+      });
     }
 
-    res.json({ session });
+    // 尝试获取拆分会话
+    const { data: session, error: sessionError } = await supabase
+      .from('requirement_splitting_sessions')
+      .select('*')
+      .eq('project_id', projectId)
+      .single();
+
+    if (sessionError) {
+      if (sessionError.code === 'PGRST116') {
+        // 没有找到会话，返回null
+        return res.json({ session: null });
+      } else if (sessionError.code === '42P01') {
+        // 表不存在
+        return res.status(500).json({ 
+          error: '需求拆分功能尚未初始化，请联系管理员执行数据库迁移',
+          code: 'TABLE_NOT_EXISTS'
+        });
+      } else {
+        console.error('Get session error:', sessionError);
+        return res.status(500).json({ 
+          error: '获取拆分会话失败',
+          details: sessionError.message
+        });
+      }
+    }
+
+    res.json({
+      session: session || null
+    });
 
   } catch (error) {
     console.error('Get splitting session error:', error);
@@ -241,7 +273,7 @@ router.get('/projects/:id/requirement-splitting/session', async (req, res) => {
  *       200:
  *         description: 成功生成新的Epic建议
  */
-router.post('/projects/:id/epics/generate', async (req, res) => {
+router.post('/requirement-splitting/projects/:id/generate-epics', async (req, res) => {
   try {
     const { id: projectId } = req.params;
     const { feedback } = req.body;
@@ -351,7 +383,7 @@ router.post('/projects/:id/epics/generate', async (req, res) => {
  *       200:
  *         description: Epic确认成功
  */
-router.put('/projects/:id/epics/confirm', async (req, res) => {
+router.post('/requirement-splitting/projects/:id/confirm-epics', async (req, res) => {
   try {
     const { id: projectId } = req.params;
     const { epics } = req.body;

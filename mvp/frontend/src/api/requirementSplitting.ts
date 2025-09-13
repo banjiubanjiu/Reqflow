@@ -80,12 +80,12 @@ export const requirementSplittingApi = {
 
   // 重新生成Epic建议
   regenerateEpics: (projectId: string, feedback?: string): Promise<RegenerateEpicsResponse> => {
-    return api.post(`/projects/${projectId}/epics/generate`, { feedback })
+    return api.post(`/requirement-splitting/projects/${projectId}/generate-epics`, { feedback })
   },
 
   // 确认Epic拆分
   confirmEpics: (projectId: string, epics: Epic[]): Promise<ConfirmEpicsResponse> => {
-    return api.put(`/projects/${projectId}/epics/confirm`, { epics })
+    return api.post(`/requirement-splitting/projects/${projectId}/confirm-epics`, { epics })
   },
 
   // 为Epic生成Story建议

@@ -40,7 +40,10 @@
         <!-- 加载状态 -->
         <div v-if="splittingStore.loading && !splittingStore.hasSession" class="loading-container">
           <el-skeleton :rows="5" animated />
-          <div class="loading-text">AI正在分析项目需求和技术选型...</div>
+          <div class="loading-text">
+            <div>AI正在分析项目需求和技术选型...</div>
+            <div class="loading-tips">这是一个复杂的AI任务，通常需要1-2分钟，请耐心等待</div>
+          </div>
         </div>
 
         <!-- Epic建议阶段 -->
@@ -85,66 +88,121 @@
           </div>
         </div>
 
-        <!-- Story生成阶段 -->
-        <div v-else-if="splittingStore.currentStep === 'story_generation'" class="story-generation-stage">
-          <div class="stage-header">
-            <h2>Story生成</h2>
-            <p>为每个Epic生成具体的用户故事和技术实现规格：</p>
-          </div>
-
-          <div class="epics-list">
-            <div 
-              v-for="(epic, index) in splittingStore.epics"
-              :key="epic.id || index"
-              class="epic-item"
-            >
-              <div class="epic-header">
-                <h3>{{ epic.name }}</h3>
-                <el-button 
-                  type="primary"
-                  size="small"
-                  @click="handleGenerateStories(epic.id)"
-                  :loading="splittingStore.loading"
-                >
-                  生成Story
-                </el-button>
+        <!-- Story处理阶段 -->
+        <div v-else-if="splittingStore.currentStep === 'story_processing'" class="story-processing-stage">
+          <!-- 进度显示 -->
+          <div class="story-progress-section">
+            <div class="progress-header">
+              <h2>Story拆分进度</h2>
+              <div class="progress-info">
+                <span>{{ splittingStore.storyProgress.current }} / {{ splittingStore.storyProgress.total }} Epic已完成</span>
+                <el-progress 
+                  :percentage="splittingStore.storyProgress.percentage" 
+                  :stroke-width="8"
+                  :show-text="false"
+                />
               </div>
-              <p class="epic-description">{{ epic.description }}</p>
             </div>
           </div>
-        </div>
 
-        <!-- Story确认阶段 -->
-        <div v-else-if="splittingStore.currentStep === 'story_confirm'" class="story-confirm-stage">
-          <div class="stage-header">
-            <h2>Story确认</h2>
-            <p>AI为Epic生成了以下Story建议，请选择需要的Story：</p>
+          <!-- 当前Epic信息 -->
+          <div v-if="splittingStore.currentEpic" class="current-epic-section">
+            <div class="epic-card">
+              <div class="epic-header">
+                <div class="epic-info">
+                  <h3>{{ splittingStore.currentEpic.name }}</h3>
+                  <p class="epic-description">{{ splittingStore.currentEpic.description }}</p>
+                </div>
+                <div class="epic-meta">
+                  <el-tag size="small" type="info">{{ splittingStore.currentEpic.business_domain }}</el-tag>
+                  <el-tag size="small" :type="getPriorityType(splittingStore.currentEpic.priority)">
+                    {{ splittingStore.currentEpic.priority }}
+                  </el-tag>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="story-suggestions-grid">
-            <StorySuggestionCard
-              v-for="(story, index) in splittingStore.storySuggestions"
-              :key="index"
-              :story="story"
-              :selected="selectedStories.includes(story)"
-              @toggle="handleToggleStory"
-              @view-detail="handleViewStoryDetail"
-            />
+          <!-- Story生成阶段 -->
+          <div v-if="splittingStore.currentEpicStoryStep === 'generating'" class="story-generation-content">
+            <div class="stage-header">
+              <h3>为当前Epic生成Story</h3>
+              <p>AI将基于Epic的描述和技术要求生成具体的用户故事</p>
+            </div>
+
+            <div class="generation-actions">
+              <el-button 
+                type="primary"
+                size="large"
+                @click="handleGenerateCurrentEpicStories"
+                :loading="splittingStore.loading"
+              >
+                <el-icon><Star /></el-icon>
+                生成Story建议
+              </el-button>
+              
+              <div class="action-buttons">
+                <el-button 
+                  v-if="splittingStore.currentEpicIndex > 0"
+                  @click="handlePreviousEpic"
+                >
+                  <el-icon><ArrowLeft /></el-icon>
+                  上一个Epic
+                </el-button>
+                <el-button @click="handleSkipCurrentEpic">
+                  跳过此Epic
+                </el-button>
+              </div>
+            </div>
           </div>
 
-          <div class="stage-actions">
-            <el-button @click="handleBackToEpics">
-              <el-icon><ArrowLeft /></el-icon>
-              返回Epic
-            </el-button>
-            <el-button 
-              type="primary"
-              :disabled="selectedStories.length === 0"
-              @click="handleConfirmStories"
-              :loading="splittingStore.loading"
-            >
-              确认选择 ({{ selectedStories.length }})
-            </el-button>
+          <!-- Story确认阶段 -->
+          <div v-else-if="splittingStore.currentEpicStoryStep === 'confirming'" class="story-confirm-content">
+            <div class="stage-header">
+              <h3>确认Story建议</h3>
+              <p>请选择需要的Story，可以修改或跳过不需要的Story</p>
+            </div>
+
+            <div class="story-suggestions-grid">
+              <StorySuggestionCard
+                v-for="(story, index) in splittingStore.storySuggestions"
+                :key="index"
+                :story="story"
+                :selected="selectedStories.includes(story)"
+                @toggle="handleToggleStory"
+                @view-detail="handleViewStoryDetail"
+              />
+            </div>
+
+            <div class="confirm-actions">
+              <div class="action-buttons">
+                <el-button @click="handleRegenerateCurrentEpicStories">
+                  <el-icon><Refresh /></el-icon>
+                  重新生成
+                </el-button>
+                <el-button 
+                  v-if="splittingStore.currentEpicIndex > 0"
+                  @click="handlePreviousEpic"
+                >
+                  <el-icon><ArrowLeft /></el-icon>
+                  上一个Epic
+                </el-button>
+                <el-button @click="handleSkipCurrentEpic">
+                  跳过此Epic
+                </el-button>
+              </div>
+              
+              <el-button 
+                type="primary"
+                size="large"
+                :disabled="selectedStories.length === 0"
+                @click="handleConfirmCurrentEpicStories"
+                :loading="splittingStore.loading"
+              >
+                确认选择 ({{ selectedStories.length }})
+                <el-icon><ArrowRight /></el-icon>
+              </el-button>
+            </div>
           </div>
         </div>
 
@@ -245,10 +303,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Refresh, View } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, Refresh, View, Star } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'
 import { useRequirementSplittingStore } from '@/stores/requirementSplitting'
 import SplittingProgress from '@/components/business/SplittingProgress.vue'
@@ -284,7 +342,11 @@ const totalEstimatedHours = computed(() => {
 
 // 方法
 const initializeSplitting = async () => {
-  if (!projectId.value) return
+  if (!projectId.value) {
+    ElMessage.error('项目ID缺失，请重新进入页面')
+    router.push('/home')
+    return
+  }
 
   // 先加载项目信息
   const projectResult = await projectStore.fetchProject(projectId.value)
@@ -371,19 +433,33 @@ const handleEpicConfirmDialogConfirm = async (epics: Epic[]) => {
   showEpicConfirmDialog.value = false
 }
 
-const handleGenerateStories = async (epicId: string | undefined) => {
-  if (!epicId) {
-    ElMessage.error('Epic ID不存在')
+const handleGenerateCurrentEpicStories = async () => {
+  const currentEpic = splittingStore.currentEpic
+  if (!currentEpic?.id) {
+    ElMessage.error('当前Epic信息不存在')
     return
   }
   
-  const result = await splittingStore.generateStories(epicId)
+  const result = await splittingStore.generateStories(currentEpic.id)
   
   if (result.success) {
     ElMessage.success('Story建议生成成功')
   } else {
     ElMessage.error(result.message || 'Story生成失败')
   }
+}
+
+const handleRegenerateCurrentEpicStories = async () => {
+  // 重置到生成阶段，然后重新生成
+  splittingStore.currentEpicStoryStep = 'generating'
+  selectedStories.value = []
+  
+  // 清空当前的story建议
+  if (splittingStore.currentSession) {
+    splittingStore.currentSession.story_suggestions = []
+  }
+  
+  await handleGenerateCurrentEpicStories()
 }
 
 const handleToggleStory = (story: Story) => {
@@ -400,31 +476,54 @@ const handleViewStoryDetail = (story: Story) => {
   showStoryDetailModal.value = true
 }
 
-const handleConfirmStories = async () => {
-  if (splittingStore.epics.length === 0) {
-    ElMessage.error('没有找到Epic信息')
-    return
-  }
-
-  // 假设为第一个Epic确认Story（实际应该根据Story所属的Epic来确认）
-  const epicId = splittingStore.epics[0].id
-  if (!epicId) {
-    ElMessage.error('Epic ID不存在')
+const handleConfirmCurrentEpicStories = async () => {
+  const currentEpic = splittingStore.currentEpic
+  if (!currentEpic?.id) {
+    ElMessage.error('当前Epic信息不存在')
     return
   }
   
-  const result = await splittingStore.confirmStories(epicId, selectedStories.value)
+  const result = await splittingStore.confirmStories(currentEpic.id, selectedStories.value)
   
   if (result.success) {
-    ElMessage.success('Story确认成功')
+    ElMessage.success(`Epic "${currentEpic.name}" 的Story确认成功`)
     selectedStories.value = []
+    
+    // 如果还有更多Epic，提示用户
+    if (splittingStore.currentEpicIndex < splittingStore.epics.length - 1) {
+      ElMessage.info('继续处理下一个Epic')
+    }
   } else {
     ElMessage.error(result.message || 'Story确认失败')
   }
 }
 
-const handleBackToEpics = () => {
-  splittingStore.setCurrentStep('epic_suggestion')
+const handleSkipCurrentEpic = () => {
+  const currentEpic = splittingStore.currentEpic
+  if (currentEpic) {
+    ElMessageBox.confirm(
+      `确定要跳过Epic "${currentEpic.name}" 吗？跳过后可以稍后回来处理。`,
+      '跳过Epic',
+      {
+        confirmButtonText: '跳过',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    ).then(() => {
+      splittingStore.skipCurrentEpic()
+      selectedStories.value = []
+      
+      if (splittingStore.currentStep === 'completed') {
+        ElMessage.success('所有Epic处理完成！')
+      }
+    }).catch(() => {
+      // 用户取消
+    })
+  }
+}
+
+const handlePreviousEpic = () => {
+  splittingStore.goToPreviousEpic()
   selectedStories.value = []
 }
 
@@ -459,9 +558,39 @@ const handleExportAll = async () => {
   }
 }
 
+const getPriorityType = (priority: string | number) => {
+  const p = String(priority || '').toLowerCase()
+  switch (p) {
+    case 'high':
+    case '高':
+    case '3':
+      return 'danger'
+    case 'medium':
+    case '中':
+    case '2':
+      return 'warning'
+    case 'low':
+    case '低':
+    case '1':
+      return 'info'
+    default:
+      return ''
+  }
+}
+
+// 监听路由参数变化
+watch(() => route.params.id, (newId) => {
+  if (newId) {
+    initializeSplitting()
+  }
+}, { immediate: true })
+
 // 页面初始化
-onMounted(() => {
-  initializeSplitting()
+onMounted(async () => {
+  // 如果路由参数已经存在，直接初始化
+  if (projectId.value) {
+    initializeSplitting()
+  }
 })
 
 // 页面卸载时清理状态
@@ -600,6 +729,126 @@ onUnmounted(() => {
   justify-content: center;
   gap: 16px;
   padding: 24px 0;
+}
+
+/* Story处理阶段样式 */
+.story-processing-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.story-progress-section {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid var(--border-color-lighter);
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.progress-header h2 {
+  margin: 0;
+  font-size: 18px;
+  color: var(--color-text-primary);
+}
+
+.progress-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 300px;
+}
+
+.progress-info span {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.current-epic-section {
+  background: white;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid var(--border-color-lighter);
+}
+
+.epic-card {
+  border: 2px solid var(--color-primary);
+  border-radius: 8px;
+  padding: 16px;
+  background: var(--color-primary-light-9);
+}
+
+.epic-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.epic-info h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  color: var(--color-text-primary);
+}
+
+.epic-description {
+  margin: 0;
+  color: var(--color-text-regular);
+  line-height: 1.5;
+}
+
+.epic-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.story-generation-content,
+.story-confirm-content {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  border: 1px solid var(--border-color-lighter);
+}
+
+.story-generation-content .stage-header,
+.story-confirm-content .stage-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.story-generation-content h3,
+.story-confirm-content h3 {
+  margin: 0 0 8px 0;
+  font-size: 20px;
+  color: var(--color-text-primary);
+}
+
+.generation-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 24px;
+  gap: 16px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
 }
 
 .completion-banner {

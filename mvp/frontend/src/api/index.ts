@@ -5,7 +5,7 @@ import { ElMessage } from 'element-plus'
 // 创建axios实例
 const api = axios.create({
   baseURL: '/api',
-  timeout: 30000, // 增加到30秒，因为AI请求可能较慢
+  timeout: 120000, // 增加到120秒，因为AI需求拆分需要更长处理时间
   headers: {
     'Content-Type': 'application/json'
   }
@@ -63,7 +63,10 @@ api.interceptors.response.use(
     } else if (error.request) {
       // 网络错误或超时
       if (error.code === 'ECONNABORTED') {
-        ElMessage.error('请求超时，AI处理时间较长，请稍后重试')
+        ElMessage.error({
+          message: 'AI处理超时，需求拆分是复杂任务，可能需要2-3分钟。请稍后重试。',
+          duration: 8000
+        })
       } else {
         ElMessage.error('网络连接失败，请检查网络设置')
       }
